@@ -19,4 +19,7 @@ social: true  # includes social icons at the bottom of the page
 
 I have a passion for harnessing the power of data to drive organizational success. With many year of experience in data field, I have a proven track
 record of turnning data into actionable insights that directly impact
-business outcomes. 
+business outcomes.
+
+As a data team leader, my primary focus is on aligning data initiatives with
+our institution strategic goals. I lead a dynamic team of data professionals who are data engineers, data analysts, data scientists, machine learning engineers.
