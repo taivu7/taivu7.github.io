@@ -94,10 +94,11 @@
       "summary": "Revamp inefficient operating processes, and surpass KPI targets"
     }
   ],
-  "certificates": ["Machine Learning Engineering for Production",
-    "DeepLearning.AI TensorFlow Developer", "Google Cloud Platform Big Data and Machine Learning"],
+  "certificates": [],
   "publications": [],
-  "skills": [{"Programming language": "Python, SQL, C++"}],
+  "skills": [
+    { "name": "Programming language",
+      "keywords": "Python, SQL, C++"}],
   "languages": [
     {
       "language": "Vietnamese",
@@ -108,7 +109,9 @@
       "fluency": "Fluent"
     }
   ],
-  "interests": ["run", "read books", "Cultivate and nurture trees"],
+  "interests": [
+    { "name": "Hobbies",
+      "keywords": ["run", "read books", "Cultivate and nurture trees"]}],
   "references": [],
   "projects": []
 }
