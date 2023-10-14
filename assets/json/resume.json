@@ -17,8 +17,8 @@
     "profiles": [
       {
         "network": "Twitter",
-        "username": "AlbertEinstein",
-        "url": "https://twitter.com/AlbertEinstein"
+        "username": "",
+        "url": ""
       }
     ]
   },
@@ -31,10 +31,8 @@
       "endDate": "Current",
       "summary": "My role involves guiding and empowering the team to meet and exceed key performance indicators, ensuring data quality, and implementing effective strategies for data analysis. Together, we work to drive informed decision-making, improve processes, and deliver impactful results through data-driven solutions, all while fostering a culture of collaboration and innovation within the team",
       "highlights": [
-        "Develop and implement machine learning algorithms used to suggest
-        data packages for users",
-        "Work with large-scale data sets, utilizing distributed computing
-        platforms such as Apache Spark"
+        "Develop and implement machine learning algorithms used to suggest data packages for users",
+        "Work with large-scale data sets, utilizing distributed computing platforms such as Apache Spark"
       ]
     },
     {
@@ -46,10 +44,8 @@
       "summary": "My responsibilities include leveraging cutting-edge data analysis techniques and machine learning to identify threats, vulnerabilities, and patterns within the ever-evolving landscape of online security. I work closely with cross-functional teams to develop predictive models, detect anomalies, and strengthen the company's defense mechanisms",
       "highlights": [
         "Designed and developed database system from zero",
-        "Developed services for collecting information in many sources such
-        as internal data, social networks, news, forums, etc.",
-        "Collaborated with Blue and Red team to analyze and identify the security
-        threats of customer"
+        "Developed services for collecting information in many sources such as internal data, social networks, news, forums, etc.",
+        "Collaborated with Blue and Red team to analyze and identify the security threats of customer"
       ]
     },
     {
@@ -62,9 +58,7 @@
       "highlights": [
         "Relativity"
       ]
-    },
-
-    
+    }
   ],
   "volunteer": [],
   "education": [
@@ -107,7 +101,7 @@
       "fluency": "Fluent"
     }
   ],
-  "interests": [],
+  "interests": ["run", "read books", "Cultivate and nurture trees"],
   "references": [],
   "projects": []
 }
