@@ -6,7 +6,7 @@
     "email": "me@taivu.dev",
     "phone": "(+84)797-997-992",
     "url": "https://taivu.dev",
-    "summary": "A German-born theoretical physicist, widely ranked among the greatest and most influential scientists of all time",
+    "summary": "A Vietnamese man who has a deep affection for nature, a fascination with technology, and an insatiable curiosity.",
     "location": {
       "address": "",
       "postalCode": "76100",
@@ -28,11 +28,15 @@
       "position": "Lead Data Scientist",
       "url": "https://www.mobifone.vn",
       "startDate": "2020-09",
-      "endDate": "Current",
+      "endDate": "now",
       "summary": "My role involves guiding and empowering the team to meet and exceed key performance indicators, ensuring data quality, and implementing effective strategies for data analysis. Together, we work to drive informed decision-making, improve processes, and deliver impactful results through data-driven solutions, all while fostering a culture of collaboration and innovation within the team",
       "highlights": [
         "Develop and implement machine learning algorithms used to suggest data packages for users",
-        "Work with large-scale data sets, utilizing distributed computing platforms such as Apache Spark"
+        "Work with large-scale data sets, utilizing distributed computing platforms such as Apache Spark",
+        "Utilize deep learning framework Pytorch for internal projects",
+        "Optimize sending daily SMS to the candidate user list by redesigning process flow and operating on distributed systems",
+        "Maintain and manage on-premise and cloud servers",
+        "Collaborate with cross-functional teams to identify and solve complex problems in a fast-paced environment"
       ]
     },
     {
@@ -56,7 +60,9 @@
       "endDate": "2019-09",
       "summary": "Worked on data-product team responsible for providing business reports, analyzing generated data to make valuable insights",
       "highlights": [
-        "Relativity"
+        "Built data pipelines for monitoring and evaluating the efficiency of Zalo features",
+        "Utilized deep learning framework of Theano for image classification",
+        "Conducted advanced analysis using models in machine learning"
       ]
     }
   ],
@@ -88,9 +94,10 @@
       "summary": "Revamp inefficient operating processes, and surpass KPI targets"
     }
   ],
-  "certificates": [],
+  "certificates": ["Machine Learning Engineering for Production",
+    "DeepLearning.AI TensorFlow Developer", "Google Cloud Platform Big Data and Machine Learning"],
   "publications": [],
-  "skills": [],
+  "skills": [{"Programming language": "Python, SQL, C++"}],
   "languages": [
     {
       "language": "Vietnamese",
