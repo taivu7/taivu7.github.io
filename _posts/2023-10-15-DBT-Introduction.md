@@ -9,4 +9,5 @@ giscus_comments: true
 related_posts: false
 ---
 
-In this post we will learn about DBT technology.
+#1 Introduction
+As a data team leader, I encounter frequently problems related to data management. 
