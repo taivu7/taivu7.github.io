@@ -9,5 +9,6 @@ giscus_comments: true
 related_posts: false
 ---
 
-#1 Introduction
-As a data team leader, I encounter frequently problems related to data management. 
+## Introduction
+
+As a data team leader, I encounter frequently problems related to data management. One of the challenging problems is how to manage data aggregation flows in a effective way. We have difficulty when the team size become bigger, and many projects need to build.
