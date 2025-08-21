@@ -35,6 +35,9 @@ To process this simple sentence, an RNN must:
 
 Even for short sentences this is inefficient, and for millions of sequences in large datasets, it makes training extremly slow.
 
+### 2. Long-Distance Dependencies Are Hard
+
+
 There were some approaches like Convolutional methods tried to improve parallelism but still required multiple layers to capture relation of distant parts (tokens, words). The challenge remained: **how to model long-range relationships efficiently**
 
 ---
