@@ -48,6 +48,17 @@ function BlogList() {
     );
   }
 
+  if (posts.length === 0) {
+    return (
+      <div className="blog-list">
+        <div className="blog-header">
+          <h2 className="blog-title">Latest Posts</h2>
+          <p className="blog-description">No posts found.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="blog-list">
       <div className="blog-header">

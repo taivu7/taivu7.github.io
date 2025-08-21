@@ -1,4 +1,6 @@
 import { marked } from 'marked';
+// Load markdown content directly from source files
+import { loadMarkdownFromFiles } from '../data/posts/markdownImports';
 
 // Configure marked options for better rendering
 marked.setOptions({
@@ -65,14 +67,9 @@ export async function loadMarkdownPost(fileName) {
   console.log('loadMarkdownPost - fileName:', fileName);
   
   try {
-    // Load content from public directory via fetch
-    const response = await fetch(`/posts/${fileName}`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${fileName}: ${response.status}`);
-    }
-    
-    const markdownContent = await response.text();
-    console.log('loadMarkdownPost - loaded content, length:', markdownContent.length);
+    // Load markdown content directly from files
+    const markdownContent = await loadMarkdownFromFiles(fileName);
+    console.log('loadMarkdownPost - loaded from file, length:', markdownContent.length);
     
     // Parse frontmatter and content
     const { data: frontmatter, content } = parseFrontmatter(markdownContent);
@@ -99,26 +96,21 @@ export async function loadMarkdownPost(fileName) {
   }
 }
 
-// Function to dynamically load all posts from public directory
+// Function to dynamically load all posts from markdown files
 export async function loadAllPosts() {
   try {
-    // For now, we'll need to manually maintain a list of post files
-    // GitHub Pages doesn't support directory listing
+    const posts = [];
+    
+    // List of markdown files to load - updated to match actual files
     const postFiles = [
       '2025-08-20-attention-mechanism-in-llm.md'
     ];
     
-    const posts = [];
+    console.log('loadAllPosts - loading from markdown files:', postFiles);
     
     for (const fileName of postFiles) {
       try {
-        const response = await fetch(`/posts/${fileName}`);
-        if (!response.ok) {
-          console.warn(`Failed to load ${fileName}: ${response.status}`);
-          continue;
-        }
-        
-        const content = await response.text();
+        const content = await loadMarkdownFromFiles(fileName);
         const { data: frontmatter } = parseFrontmatter(content);
         
         // Create post object with metadata
@@ -137,11 +129,13 @@ export async function loadAllPosts() {
         };
         
         posts.push(post);
+        console.log('loadAllPosts - loaded post from file:', post.title);
       } catch (error) {
         console.error(`Error loading post ${fileName}:`, error);
       }
     }
     
+    console.log('loadAllPosts - total posts loaded:', posts.length);
     return posts.sort((a, b) => b.publishedDate - a.publishedDate);
   } catch (error) {
     console.error('Error loading all posts:', error);

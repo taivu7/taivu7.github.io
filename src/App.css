@@ -130,14 +130,32 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background: url('./assets/cover_img.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   padding: 2rem 0;
+  position: relative;
+}
+
+.hero-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1;
 }
 
 .hero-container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 2rem;
+  position: relative;
+  z-index: 2;
 }
 
 .hero-content {
@@ -149,9 +167,10 @@ body {
 .hero-title {
   font-size: 3.5rem;
   font-weight: 700;
-  color: #2c3e50;
+  color: #ffffff;
   margin-bottom: 1rem;
   line-height: 1.2;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .wave-emoji {
@@ -173,19 +192,21 @@ body {
 
 .hero-subtitle {
   font-size: 1.5rem;
-  color: #7f8c8d;
+  color: #e9ecef;
   margin-bottom: 1.5rem;
   font-weight: 400;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .hero-description {
   font-size: 1.2rem;
-  color: #555;
+  color: #f8f9fa;
   margin-bottom: 2.5rem;
   line-height: 1.8;
   max-width: 600px;
   margin-left: auto;
   margin-right: auto;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .hero-buttons {

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import './App.css';
 import Home from './pages/Home';
@@ -26,7 +27,7 @@ function Navbar() {
             <Link to="/blog" className={`nav-link ${location.pathname.startsWith('/blog') ? 'active' : ''}`}>Blog</Link>
           </li>
           <li className="nav-item">
-            <a href="#contact" className="nav-link">Contact</a>
+            <Link to="/#contact" className="nav-link">Contact</Link>
           </li>
         </ul>
       </div>
@@ -34,11 +35,30 @@ function Navbar() {
   );
 }
 
+function ScrollToHash() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.hash) {
+      // Small delay to ensure the element is rendered
+      setTimeout(() => {
+        const element = document.getElementById(location.hash.substring(1));
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    }
+  }, [location]);
+
+  return null;
+}
+
 function App() {
   return (
     <Router>
       <div className="App">
         <Navbar />
+        <ScrollToHash />
         
         <main className="main-content">
           <Routes>
