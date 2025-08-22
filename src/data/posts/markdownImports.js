@@ -2,19 +2,19 @@
 export const loadMarkdownFromFiles = async (fileName) => {
   try {
     // Handle custom domain and GitHub Pages deployment
-    // For custom domains, we need to use the full domain path
     let baseUrl = '';
     
     // In development, use localhost
     if (process.env.NODE_ENV === 'development') {
       baseUrl = '';
     } else {
-      // In production, use relative path that works with custom domains
-      baseUrl = process.env.PUBLIC_URL || '';
+      // In production, always use relative path for custom domains and GitHub Pages
+      // Since we're deploying to a custom domain (taivu.dev), use relative path
+      baseUrl = '';
     }
     
     const url = `${baseUrl}/posts/${fileName}`;
-    console.log('Loading markdown from:', url);
+    console.log('Loading markdown from:', url, 'PUBLIC_URL:', process.env.PUBLIC_URL);
     
     const response = await fetch(url);
     if (!response.ok) {
