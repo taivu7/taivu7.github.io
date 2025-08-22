@@ -1,32 +1,43 @@
-// Load markdown content from source files instead of hardcoded strings
+// Load markdown content from source files
 export const loadMarkdownFromFiles = async (fileName) => {
   try {
-    // Handle custom domain and GitHub Pages deployment
-    let baseUrl = '';
-    
-    // In development, use localhost
-    if (process.env.NODE_ENV === 'development') {
-      baseUrl = '';
-    } else {
-      // In production, always use relative path for custom domains and GitHub Pages
-      // Since we're deploying to a custom domain (taivu.dev), use relative path
-      baseUrl = '';
-    }
-    
-    const url = `${baseUrl}/posts/${fileName}`;
-    console.log('Loading markdown from:', url, 'PUBLIC_URL:', process.env.PUBLIC_URL);
+    // For custom domains like taivu.dev, use relative path
+    // PUBLIC_URL is empty for custom domains, so always use relative path
+    const url = `/posts/${fileName}`;
     
     const response = await fetch(url);
     if (!response.ok) {
-      console.error(`Failed to fetch ${fileName}: ${response.status} ${response.statusText}`);
       throw new Error(`Failed to fetch ${fileName}: ${response.status}`);
     }
     
-    const content = await response.text();
-    console.log(`Successfully loaded ${fileName}, content length:`, content.length);
-    return content;
+    return await response.text();
   } catch (error) {
     console.error('Error loading markdown file:', error);
     throw error;
   }
+};
+
+// List of markdown files to import
+export const markdownFiles = [
+  '2025-08-20-attention-mechanism-in-llm.md',
+];
+
+// Function to import all markdown files
+export const importAllMarkdown = async () => {
+  const importedFiles = {};
+  for (const file of markdownFiles) {
+    try {
+      const content = await loadMarkdownFromFiles(file);
+      importedFiles[file] = content;
+    } catch (error) {
+      console.error(`Error importing ${file}:`, error);
+      importedFiles[file] = null;
+    }
+  }
+  return importedFiles;
+};
+
+// Function to get all markdown files
+export const getAllMarkdownFiles = async () => {
+  return await importAllMarkdown();
 };
