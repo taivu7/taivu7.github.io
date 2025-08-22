@@ -11,39 +11,35 @@ marked.setOptions({
   mangle: false,
 });
 
-// Custom renderer for math expressions
-const renderer = new marked.Renderer();
-
-// Handle math blocks ($$...$$)
-renderer.paragraph = function(text) {
-  const mathBlockRegex = /^\$\$([\s\S]*?)\$\$$/;
-  const match = text.match(mathBlockRegex);
-  
-  if (match) {
-    try {
-      const latex = match[1].trim();
-      return `<div class="math-display">${katex.renderToString(latex, { displayMode: true })}</div>`;
-    } catch (error) {
-      console.error('KaTeX rendering error:', error);
-      return `<div class="math-error">Math rendering error: ${error.message}</div>`;
-    }
+// Math processing function
+function processMathWithKatex(content) {
+  if (typeof content !== 'string') {
+    return content;
   }
   
-  // Handle inline math ($...$)
-  const inlineMathRegex = /\$([^$\n]+?)\$/g;
-  const processedText = text.replace(inlineMathRegex, (_, latex) => {
+  // Handle display math blocks ($$...$$)
+  content = content.replace(/\$\$([\s\S]*?)\$\$/g, (match, latex) => {
     try {
-      return katex.renderToString(latex, { displayMode: false });
+      const cleanLatex = latex.trim();
+      return `<div class="math-display">${katex.renderToString(cleanLatex, { displayMode: true })}</div>`;
     } catch (error) {
-      console.error('KaTeX inline rendering error:', error);
-      return `<span class="math-error">[Math Error: ${error.message}]</span>`;
+      console.error('KaTeX display math error:', error);
+      return `<div class="math-error">Math rendering error: ${error.message}</div>`;
     }
   });
   
-  return `<p>${processedText}</p>`;
-};
-
-marked.use({ renderer });
+  // Handle inline math ($...$)
+  content = content.replace(/\$([^$\n]+?)\$/g, (match, latex) => {
+    try {
+      return `<span class="math-inline">${katex.renderToString(latex, { displayMode: false })}</span>`;
+    } catch (error) {
+      console.error('KaTeX inline math error:', error);
+      return `<span class="math-error">[Math Error]</span>`;
+    }
+  });
+  
+  return content;
+}
 
 // Simple frontmatter parser that works in the browser
 function parseFrontmatter(content) {
@@ -110,8 +106,9 @@ export async function loadMarkdownPost(fileName) {
     const { data: frontmatter, content } = parseFrontmatter(markdownContent);
     console.log('loadMarkdownPost - frontmatter:', frontmatter);
     
-    // Convert markdown to HTML
-    const htmlContent = marked(content);
+    // Process math expressions first, then convert markdown to HTML
+    const mathProcessedContent = processMathWithKatex(content);
+    const htmlContent = marked(mathProcessedContent);
     
     const result = {
       frontmatter,
