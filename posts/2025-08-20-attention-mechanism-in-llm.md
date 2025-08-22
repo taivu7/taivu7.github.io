@@ -28,10 +28,10 @@ Example:
 I love machine learning.
 ```
 To process this simple sentence, an RNN must:
-1. Process “I” → state h1
-2. Process "love" with h1 -> state h2
-3. Process "machine" with h2 -> state h3
-4. Proces "learning" with h3 -> state h4
+    1. Process “I” → state h1
+    2. Process "love" with h1 -> state h2
+    3. Process "machine" with h2 -> state h3
+    4. Proces "learning" with h3 -> state h4
 
 Even for short sentences this is inefficient, and for millions of sequences in large datasets, it makes training extremly slow.
 
@@ -50,9 +50,11 @@ The Transformer solved this by replying entirely on **attention mechanism**. Ins
 in the sequence - no matter how far apart. This significantly reduces path lengths between dependencies and allows for massive parallelization during training.
 
 The general attention mechanism can be expressed as:
+
 $$
 \text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right) V
 $$
+
 Where:
 - Q (Query): What information am I looking for?
 - K (Key): What information is available?
