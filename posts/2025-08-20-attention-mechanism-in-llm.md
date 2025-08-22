@@ -36,6 +36,28 @@ To process this simple sentence, an RNN must:
 Even for short sentences this is inefficient, and for millions of sequences in large datasets, it makes training extremly slow.
 
 ### 2. Long-Distance Dependencies Are Hard
+RNNs process sequences word by word, passing information from one node to the next in the network. This makes it difficult to remember relationships between words that are far apart.
+
+Example:
+```text
+The park, which is 1 km away from my house, is a wonderful place for dating.
+```
+To predict the word *"dating"*, the model needs to recall that *"The park"* appeared at the beginning. But because RNNs pass
+information step by step (park -> which -> is -> ...), the signal can weaken or vanish along the way. This is the classic **vanishing gradient problem**.
+
+## The Key Idea: Attention
+The Transformer solved this by replying entirely on **attention mechanism**. Instead of processing tokens one by one, attention lets the model directly *look at* every other word
+in the sequence - no matter how far apart. This significantly reduces path lengths between dependencies and allows for massive parallelization during training.
+
+The general attention mechanism can be expressed as:
+$$
+\text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right) V
+$$
+Where:
+- Q (Query): What information am I looking for?
+- K (Key): What information is available?
+- V (Value): The actual information content
+
 
 
 There were some approaches like Convolutional methods tried to improve parallelism but still required multiple layers to capture relation of distant parts (tokens, words). The challenge remained: **how to model long-range relationships efficiently**
