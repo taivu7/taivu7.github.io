@@ -1,4 +1,5 @@
 import { marked } from 'marked';
+import katex from 'katex';
 // Load markdown content directly from source files
 import { loadMarkdownFromFiles } from '../data/posts/markdownImports';
 
@@ -9,6 +10,40 @@ marked.setOptions({
   headerIds: true,
   mangle: false,
 });
+
+// Custom renderer for math expressions
+const renderer = new marked.Renderer();
+
+// Handle math blocks ($$...$$)
+renderer.paragraph = function(text) {
+  const mathBlockRegex = /^\$\$([\s\S]*?)\$\$$/;
+  const match = text.match(mathBlockRegex);
+  
+  if (match) {
+    try {
+      const latex = match[1].trim();
+      return `<div class="math-display">${katex.renderToString(latex, { displayMode: true })}</div>`;
+    } catch (error) {
+      console.error('KaTeX rendering error:', error);
+      return `<div class="math-error">Math rendering error: ${error.message}</div>`;
+    }
+  }
+  
+  // Handle inline math ($...$)
+  const inlineMathRegex = /\$([^$\n]+?)\$/g;
+  const processedText = text.replace(inlineMathRegex, (_, latex) => {
+    try {
+      return katex.renderToString(latex, { displayMode: false });
+    } catch (error) {
+      console.error('KaTeX inline rendering error:', error);
+      return `<span class="math-error">[Math Error: ${error.message}]</span>`;
+    }
+  });
+  
+  return `<p>${processedText}</p>`;
+};
+
+marked.use({ renderer });
 
 // Simple frontmatter parser that works in the browser
 function parseFrontmatter(content) {
