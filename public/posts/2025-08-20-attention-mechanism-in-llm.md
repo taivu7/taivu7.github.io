@@ -50,15 +50,32 @@ The Transformer solved this by replying entirely on **attention mechanism**. Ins
 in the sequence - no matter how far apart. This significantly reduces path lengths between dependencies and allows for massive parallelization during training.
 
 The general attention mechanism can be expressed as:
+$$
+\text{Attention}(Q, K, V) = \text{softmax}(\text{score}(Q, K)) \cdot V
+$$
 
+**Where:**
+
+- Q (Query): What information am I looking for?
+- K (Key): What information is available?
+- V (Value): The actual information content
+
+The most commonly used attention mechanism is scaled dot-product attention
 $$
 \text{Attention}(Q, K, V) = \text{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right) V
 $$
 
-Where:
-- Q (Query): What information am I looking for?
-- K (Key): What information is available?
-- V (Value): The actual information content
+**Where:**
+
+- $Q \in \mathbb{R}^{n \times d_k}$: Query matrix (n queries, each of dimension $d_k$)
+- $K \in \mathbb{R}^{m \times d_k}$: Key matrix (m keys, each of dimension $d_k$)
+- $V \in \mathbb{R}^{m \times d_v}$: Value matrix (m values, each of dimension $d_v$)
+- $d_k$: Dimension of keys (used for scaling)
+- The scaling factor $\sqrt{d_k}$ prevents the dot products from growing too large
+
+
+
+
 
 
 
