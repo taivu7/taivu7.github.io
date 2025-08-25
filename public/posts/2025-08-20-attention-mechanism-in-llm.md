@@ -37,7 +37,6 @@ Even for short sentences this is inefficient, and for millions of sequences in l
 
 ### 2. Long-Distance Dependencies Are Hard
 RNNs process sequences word by word, passing information from one node to the next in the network. This makes it difficult to remember relationships between words that are far apart.
-
 Example:
 ```text
 The park, which is 1 km away from my house, is a wonderful place for dating.
@@ -125,7 +124,6 @@ Softmax transforms raw scores into a probability distribution:
 
 #### 5. Why V Can Have Different Dimensions?
 **V (Value)**: "The actual information I want to convey"
-
 ```python
 attention_weights = softmax(QK^T / √d_k)  # [seq_len, seq_len]
 V = values  # [seq_len, d_v] - can be different!
@@ -141,7 +139,6 @@ This is a nuanced topic that depends on the type of attention being used.
 
 **Case 1: Self-Attention (Same Sequence Length)**
 In self-attention, all tokens attend to all other tokens within the same sequence:
-
 ```python
 input_sequence = "The cat sat on chair"  # 5 tokens
 
@@ -154,9 +151,7 @@ V: [5, d_v]  # 5 values (one per token)
 ```
 
 **Case 2: Cross-Attention (Different Sequence Lengths)**
-
 In cross-attention, tokens from one sequence attend to tokens from a different sequence:
-
 ```python
 # Machine Translation Example
 source = "Tôi yêu lập trình"    # Vietnamese: 4 tokens
@@ -233,9 +228,61 @@ caption = "A cat sitting on"  # Currently generating
 # "sitting" -> attends to posture-related features
 ```
 
-## The Transformer Architecture
-Processing...
+## Multi-Head Attention: Looking from Multiple Perspectives
 
+The Transformer doesn't just use a single attention function - it uses **Multi-Head Attention**, which runs multiple attention functions in parallel and then combines their outputs.
+
+### Why Multiple Heads?
+
+Think about how humans process language. When you read "The bank can guarantee deposits will eventually cover future tuition costs," your brain simultaneously processes different types of relationships:
+
+- **Syntactic relationships:** "bank" is the subject, "can guarantee" is the verb phrase
+- **Semantic relationships:** "deposits" and "tuition costs" are both financial concepts
+- **Coreference:** "deposits" refers to something the bank holds
+
+Multi-head attention allows the model to capture these different types of relationships simultaneously.
+
+### The Mathematical Formulation
+
+```python
+MultiHead(Q, K, V) = Concat(head₁, ..., head_h)W^O
+
+where head_i = Attention(QW_i^Q, KW_i^K, VW_i^V)
+```
+
+**Key parameters:**
+- **h = 8**: Number of attention heads (in the original paper)
+- **d_k = d_v = d_model/h = 64**: Dimension of each head
+- **W_i^Q, W_i^K, W_i^V**: Learned projection matrices for each head
+- **W^O**: Final output projection
+
+### What Each Head Learns
+
+Research has shown that different attention heads specialize in different linguistic phenomena:
+
+**Head 1:** Might focus on **syntactic dependencies**
+```text
+"The cat that I saw yesterday was cute"
+# Head 1 connects: "cat" ↔ "was cute" (main subject-predicate)
+```
+
+**Head 2:** Might capture **semantic relationships**
+```text
+"The bank can guarantee deposits will cover tuition"
+# Head 2 connects: "deposits" ↔ "tuition" (financial concepts)
+```
+
+**Head 3:** Might handle **positional relationships**
+```text
+"Yesterday I went to the store"
+# Head 3 connects: "Yesterday" ↔ "went" (temporal modifier)
+```
+
+## The Complete Transformer Architecture
+
+Now that we understand attention, let's see how it fits into the complete Transformer architecture.
+
+### Encoder-Decoder Structure
 
 ---
 
