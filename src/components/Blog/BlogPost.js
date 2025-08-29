@@ -1,9 +1,58 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { loadMarkdownPost } from '../../utils/markdownProcessor';
 
 function BlogPost({ post }) {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
+  const contentRef = useRef(null);
+
+  // Add copy buttons to code blocks
+  useEffect(() => {
+    if (!content || !contentRef.current) return;
+
+    const addCopyButtons = () => {
+      const codeBlocks = contentRef.current.querySelectorAll('pre');
+      
+      codeBlocks.forEach((block, index) => {
+        // Skip if already has a copy button
+        if (block.querySelector('.copy-button')) return;
+        
+        const button = document.createElement('button');
+        button.className = 'copy-button';
+        button.textContent = 'Copy';
+        button.setAttribute('aria-label', 'Copy code to clipboard');
+        
+        button.addEventListener('click', async () => {
+          const code = block.querySelector('code');
+          if (!code) return;
+          
+          try {
+            await navigator.clipboard.writeText(code.textContent);
+            button.textContent = 'Copied!';
+            button.classList.add('copied');
+            
+            setTimeout(() => {
+              button.textContent = 'Copy';
+              button.classList.remove('copied');
+            }, 2000);
+          } catch (err) {
+            console.error('Failed to copy code:', err);
+            button.textContent = 'Failed';
+            setTimeout(() => {
+              button.textContent = 'Copy';
+            }, 2000);
+          }
+        });
+        
+        block.style.position = 'relative';
+        block.appendChild(button);
+      });
+    };
+
+    // Add copy buttons after a short delay to ensure DOM is ready
+    const timer = setTimeout(addCopyButtons, 100);
+    return () => clearTimeout(timer);
+  }, [content]);
 
   useEffect(() => {
     const loadContent = async () => {
@@ -55,6 +104,7 @@ function BlogPost({ post }) {
         </div>
       </header>
       <div 
+        ref={contentRef}
         className="blog-post-body"
         dangerouslySetInnerHTML={{ __html: content }}
       />

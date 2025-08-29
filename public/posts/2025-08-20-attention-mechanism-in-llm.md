@@ -283,7 +283,10 @@ Research has shown that different attention heads specialize in different lingui
 Now that we understand attention, let's see how it fits into the complete Transformer architecture.
 
 ### Encoder-Decoder Structure
-
+The Transformer follows the classic encoder-decoder pattern:
+- **Encoder:** The job of the encoder is to take the input sequence of words and create a rich, continuous representation of it. Each layer of the encoder
+has two main sub-layers: a **multi-head self-attention mechanism** and a **position-wise fully connected feed-forward network**. The self-attention part is key—it allows the encoder to look at all the words in the input sentence at once and understand the relationships between them, no matter how far apart they are. The final encoder layer's output is then passed to the decoder. 
+**Decoder:** It works similarly to the encoder but has a crucial third sub-layer: a **multi-head attention layer over the output of the encoder**. This is where the *magic* happens! This layer allows the decoder to "look at" the encoded representation from the encoder and decide which parts are most relevant for generating the next word in the output sequence. The decoder generates the output sequence one word at a time, using the previously generated words as additional input.
 ---
 
 *The attention mechanism continues to evolve, and its applications extend far beyond natural language processing into computer vision, speech recognition, and multimodal AI systems.*

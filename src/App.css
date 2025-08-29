@@ -664,22 +664,87 @@ body {
   line-height: 1.6;
 }
 
-.blog-code-block {
-  background-color: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
+/* Enhanced Code Block Styles */
+.blog-post-body pre {
+  position: relative;
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+  border-radius: 12px;
   padding: 1.5rem;
   margin: 1.5rem 0;
   overflow-x: auto;
-  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid #34495e;
 }
 
-.blog-code-block code {
-  background: none;
+.blog-post-body pre code {
+  background: none !important;
   padding: 0;
-  color: #2c3e50;
+  color: #ecf0f1;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', 'Courier New', monospace;
   font-size: 0.9rem;
-  line-height: 1.5;
+  line-height: 1.6;
+  display: block;
+  white-space: pre;
+}
+
+/* Code block with copy button container */
+.code-block-container {
+  position: relative;
+  margin: 1.5rem 0;
+}
+
+.copy-button {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: rgba(52, 73, 94, 0.8);
+  color: #ecf0f1;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-weight: 500;
+}
+
+.copy-button:hover {
+  background: rgba(52, 152, 219, 0.9);
+  transform: translateY(-1px);
+}
+
+.copy-button.copied {
+  background: rgba(39, 174, 96, 0.9);
+}
+
+/* Inline code styles */
+.blog-post-body code:not(pre code) {
+  background-color: #f8f9fa;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+  font-size: 0.9rem;
+  color: #e83e8c;
+  border: 1px solid #e9ecef;
+}
+
+/* Syntax highlighting for different languages */
+.blog-post-body pre[class*="language-"] {
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+}
+
+.blog-post-body pre.language-python {
+  background: linear-gradient(135deg, #306998 0%, #4b8bbe 100%);
+}
+
+.blog-post-body pre.language-javascript {
+  background: linear-gradient(135deg, #f7df1e 0%, #f0db4f 100%);
+}
+
+.blog-post-body pre.language-javascript code {
+  color: #2c3e50;
 }
 
 .blog-blockquote {
