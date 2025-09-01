@@ -8,7 +8,7 @@ function Home() {
           <div className="hero-content">
             <h1 className="hero-title"><span className="wave-emoji">👋</span> I'm Tai</h1>
             <p className="hero-subtitle">
-              Curious Engineer
+              Stay Curious, Keep Learning
             </p>
             <p className="hero-description">
               Welcome to my corner of the internet. I'm passionate about exploring new technologies, sharing my knowledge, experience, and exposure.
