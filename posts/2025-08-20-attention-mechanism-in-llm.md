@@ -311,10 +311,8 @@ Since attention doesn't inherently understand token order, Transformers add **po
 
 The original paper uses sinusoidal positional encodings:
 
-```python
-PE(pos, 2i) = sin(pos / 10000^(2i/d_model))
-PE(pos, 2i+1) = cos(pos / 10000^(2i/d_model))
-```
+$$\text{PE}(pos, 2i) = sin(pos / 10000^{2i/d_{model}})\\
+\text{PE}(pos, 2i+1) = cos(pos / 10000^{2i/d_{model}})$$
 
 **Why this formula works:**
 - Different frequencies for different dimensions
