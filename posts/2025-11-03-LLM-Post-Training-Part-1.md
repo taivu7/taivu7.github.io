@@ -18,7 +18,7 @@ When we hear about models like ChatGPT, Claude, Gemini, Grok, etc. It's easy to 
 ## I. Introduction
 Think about this for a moment: GPT-3 was released in 2020. ChatGPT launched in late 2022. Same core model, but wildly different user experiences. What made the difference?
 
-![base-model vs post-trained model](./images/gpt3-vs-chatgpt.png)
+![base-model vs post-trained model](/posts/images/gpt3-vs-chatgpt.png)
 
 ### A Quick Experiment
 Imagine you ask a language model: "How do I fix my car?"
@@ -31,7 +31,7 @@ Pre-trained language models are like incredibly well-read people who've never le
 
 Ask them to write code, and they might describe what code should do rather than writing it. Ask a question, and they might generate another question. They have intelligence without direction.
 
-![pretrained-model](./images/pretrained-model.png)
+![pretrained-model](/posts/images/pretrained-model.png)
 
 
 ### Post-Training: Teaching Models to Be Useful
@@ -45,7 +45,7 @@ This is where fine-tuning and reinforcement learning come in—the two core tech
 
 Every modern AI assistant you interact with—ChatGPT, Claude, Gemini—relies on these post-training techniques. It's what got us from research curiosity to practical tool.
 
-![pretrained-model](./images/post-trained-model.png)
+![post-trained-model](/posts/images/post-trained-model.png)
 
 ### What's Ahead
 In this post, you'll discover:
