@@ -135,6 +135,7 @@ export async function loadAllPosts() {
     
     // List of markdown files to load - updated to match actual files
     const postFiles = [
+      '2025-11-03-LLM-Post-Training-Part-1.md',
       '2025-08-20-attention-mechanism-in-llm.md'
     ];
     
