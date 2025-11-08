@@ -55,4 +55,54 @@ In this post, you'll discover:
 - Real examples: teaching models to reason and stay safe.
 - How you might apply these techniques yourself.
 
+## II. The LLM Training Pipeline
+Training a large language model isn't a single step—it's a journey with three distinct stages. Understanding this pipeline helps you see where post-training fits and why it matters.
+
+### A. Pre-training: Building Raw Intelligence
+Pre-training is where it all begins. The model learns by doing one simple task over and over: predict the next word.
+
+Feed it "Once upon a midnight" and it learns to predict "dreary." Show it "The sky is" millions of times, and it learns "blue" is highly probable. When you add "The sun is setting, the sky is," suddenly "orange" becomes more likely.
+
+This happens across billions of text examples from across the internet—books, websites, articles, everything. Through this seemingly simple task, the model learns:
+- Grammar and language structure
+- Facts about the world
+- Concepts and relationships
+- Patterns in how humans write
+
+But here's the catch: **it only knows how to predict the next word**. It doesn't know it's supposed to help you, answer questions, or have conversations.
+
+Pre-training is expensive—it can take months of compute and enormous amounts of data. You start with completely random weights, and slowly the model learns to make sense of language. The result is a "base model" with incredible knowledge but no sense of purpose.
+
+
+### B. Mid-training: Specialized Enhancement
+After pre-training comes mid-training—think of it as "focused reading" rather than "reading everything."
+Mid-training continues the same next-word prediction task, but on carefully curated datasets. This stage is used for:
+Adding new languages: Maybe your base model knows English well, but you want it to master Chinese or Vietnamese. Mid-training on high-quality Chinese texts teaches it these languages without starting from scratch.
+New modalities: Want your text model to understand images or audio? Mid-training can introduce these capabilities.
+Longer context: Models initially trained on shorter texts can learn to handle much longer documents—from a few thousand words to hundreds of thousands.
+Mid-training is like having your well-read friend take specialized courses in specific subjects. The foundation is there; now you're building expertise.
+C. Post-training: Making Models Useful
+Finally, we reach post-training—the transformation from "knowledgeable" to "helpful."
+This stage uses two powerful techniques:
+Fine-tuning (Supervised Fine-Tuning/SFT): You show the model specific inputs and the exact outputs you want. "When someone asks X, respond with Y." The model learns to mimic these patterns.
+Reinforcement Learning (RL): Instead of showing exact answers, you let the model generate responses and then grade them. "That response was helpful—good job!" or "That was unsafe—try again." The model learns from feedback.
+Together, these techniques teach the model to:
+
+Understand it's an assistant whose job is to help
+Maintain conversations naturally
+Follow instructions precisely
+Refuse inappropriate requests
+Use tools and reason through problems
+Adapt its style to different contexts
+
+The Complete Journey
+Think of it this way:
+
+Pre-training: The model reads an entire library, absorbing everything but with no specific goal
+Mid-training: The model studies specialized advanced books in targeted subjects
+Post-training: The model learns to be an effective tutor—how to teach, interact, and genuinely help people
+
+Post-training is what makes a model ready for the real world. It's the difference between a brilliant recluse and a helpful assistant.
+Now that you understand the pipeline, let's dive into the heart of post-training: how fine-tuning and reinforcement learning actually work, and why they're so different.
+
 Let's start by seeing where post-training fits in the complete journey of training a language model.
