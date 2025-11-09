@@ -55,6 +55,8 @@ In this post, you'll discover:
 - Real examples: teaching models to reason and stay safe.
 - How you might apply these techniques yourself.
 
+Let's start by seeing where post-training fits in the complete journey of training a language model.
+
 ## II. The LLM Training Pipeline
 Training a large language model isn't a single step—it's a journey with three distinct stages. Understanding this pipeline helps you see where post-training fits and why it matters.
 
@@ -109,4 +111,95 @@ Post-training is what makes a model ready for the real world. It's the differenc
 
 Now that you understand the pipeline, let's dive into the heart of post-training: how fine-tuning and reinforcement learning actually work, and why they're so different.
 
-Let's start by seeing where post-training fits in the complete journey of training a language model.
+## III. Fine-Tuning vs. Reinforcement Learning: The Core Differences
+Both fine-tuning and reinforcement learning are essential for post-training, but they work in fundamentally different ways. Let's understand how.
+
+### A. The Pasta Analogy
+Imagine you want to learn how to cook the perfect pasta dish. There are two approaches:
+
+**Fine-tuning is like watching your grandma cook, step-by-step.** She boils water, adds salt, measures pasta, sets a timer. Your goal is to mimic every single step exactly as she does it. If you follow her process perfectly, you'll get her dish.
+
+**Reinforcement learning is like being told: "Make good pasta—I'll taste it and tell you how you did."** You can try anything. Throw pasta in the air if you want. Add ingredients in any order. As long as the final dish tastes great, you get a high score. The process doesn't matter—only the result.
+
+This captures the essential difference:
+- Fine-tuning teaches through **imitation**
+- Reinforcement learning teaches through **feedback on results**
+
+### B. Key Distinctions
+Let's look at a concrete example: "How do I cook pasta?"
+
+**In Fine-tuning:**
+- Input: "How do I cook pasta?".
+- Target output: "Bring salted water to boil, add pasta, follow package timing".
+- The model learns: Match this target word by word.
+- Success means: Outputting text that closely matches the target.
+
+**In Reinforcement Learning:**
+- Input: "How do I cook pasta?".
+- Model output: "Put pasta in boiling water with salt, then follow package instructions".
+- Grader evaluates: Is this helpful? Accurate? Safe?
+- The model learns: From the score it receives, not from matching specific words.
+
+The model never sees "target answers" in RL—only grades on what it produces.
+
+### C. Strengths and Trade-offs
+
+**Fine-Tuning: "It Just Works"**
+
+*Strengths:*
+- Stable and predictable: The model learns to mimic your data reliably
+- More efficient: Requires less compute and fewer GPUs
+- Well-understood: Mature techniques with proven solutions
+- Direct control: You show exactly what behavior you want
+
+*Trade-offs:*
+- Limited to your examples: The model won't discover better approaches
+- Data hungry: You need high-quality target outputs for everything
+- No creativity: It mimics rather than innovates
+
+**Reinforcement Learning: "Superhuman Potential"**
+
+*Strengths:*
+- Can exceed your examples: The model might find better solutions than you showed it
+- Learns from feedback: You don't need perfect target outputs, just good grading
+- Discovers new strategies: Like a chess AI finding novel moves
+
+*Trade-offs:*
+- Less stable: Training can be unpredictable and harder to control
+- Computationally expensive: Requires significantly more resources
+- Hard to tune: Creating good graders is challenging
+- Risk of gaming: Models might find shortcuts you didn't intend (we'll explore this more later)
+
+### D. The Winning Combination
+
+Here's the key insight: frontier labs don't choose between them—they use both.
+
+A typical approach:
+1. **Start with fine-tuning** to teach the model basic patterns and behaviors
+2. **Follow with reinforcement learning** to let it discover more efficient or better approaches
+3. **Iterate** with multiple rounds of both
+
+Think of fine-tuning as teaching the fundamentals, and reinforcement learning as advanced training that pushes beyond the basics.
+
+For example, fine-tuning might teach a model the step-by-step process for solving math problems. Then reinforcement learning lets it discover shortcuts and more elegant solutions—as long as the final answer is correct.
+
+#### When to Use What
+
+**Use fine-tuning when:**
+- You have clear examples of desired behavior
+- You want stable, predictable results
+- You need the model to follow specific formats or styles
+- You have limited compute resources
+
+**Use reinforcement learning when:**
+- You can easily verify if an output is good (like checking if code runs or math is correct)
+- You want the model to potentially exceed your examples
+- You're okay with higher compute costs
+- You have or can build good grading systems
+
+**Use both when:**
+- You're building a frontier model
+- You want the best possible performance
+- You have the resources for multiple training stages
+
+Now that you understand the difference, let's look deeper at what makes each technique actually work. First up: fine-tuning, where everything depends on the data.
