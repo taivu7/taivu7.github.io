@@ -12,22 +12,20 @@ function Navbar() {
     <nav className="navbar">
       <div className="nav-container">
         <div className="nav-logo">
-          <Link to="/">
-            <div className="home-icon">
-              <div className="home-roof"></div>
-              <div className="home-base"></div>
-            </div>
-          </Link>
+          <Link to="/" className="nav-wordmark">Tai Vu</Link>
         </div>
         <ul className="nav-menu">
           <li className="nav-item">
-            <Link to="/" className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}>Home</Link>
+            <Link to="/blog" className={`nav-link ${location.pathname.startsWith('/blog') ? 'active' : ''}`}>Writing</Link>
           </li>
           <li className="nav-item">
-            <Link to="/blog" className={`nav-link ${location.pathname.startsWith('/blog') ? 'active' : ''}`}>Blog</Link>
+            <Link to="/#experience" className="nav-link">Experience</Link>
           </li>
           <li className="nav-item">
-            <Link to="/#contact" className="nav-link">Contact</Link>
+            <Link to="/#about" className="nav-link">About</Link>
+          </li>
+          <li className="nav-item">
+            <Link to="/#contact" className="nav-link nav-link-accent">Contact</Link>
           </li>
         </ul>
       </div>
@@ -70,7 +68,8 @@ function App() {
 
         <footer className="footer">
           <div className="container">
-            <p>&copy; 2025 Tai Vu. All rights reserved.</p>
+            <p>Tai Vu — Ho Chi Minh City</p>
+            <span className="footer-meta">© 2026</span>
           </div>
         </footer>
       </div>

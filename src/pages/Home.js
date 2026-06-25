@@ -1,55 +1,160 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getRecentPosts } from '../data/posts';
+import './Landing.css';
+
+const EXPERIENCE = [
+  {
+    role: 'Data Team Lead · MobiFone',
+    detail:
+      'Leading ML models and centralized data pipelines that lift customer engagement at telecom scale.',
+    period: '2020 — Now',
+  },
+  {
+    role: 'Senior Data Scientist · Opusmatch',
+    detail:
+      'Advisor (US SaaS) — predictive and prescriptive models, data quality, and algorithm development.',
+    period: '2023 — 2025',
+  },
+  {
+    role: 'Senior Data Scientist · VinCSS',
+    detail:
+      'Applied ML and statistical methods to threat detection and product security.',
+    period: '2019 — 2020',
+  },
+  {
+    role: 'Data Scientist · Zalo',
+    detail:
+      'ML models and A/B testing for user-facing product features, with real-time monitoring pipelines.',
+    period: '2016 — 2019',
+  },
+];
+
+function formatMonthYear(date) {
+  return new Date(date).toLocaleDateString('en-US', {
+    month: 'short',
+    year: 'numeric',
+  });
+}
 
 function Home() {
-  return (
-    <>
-      <section id="home" className="hero-section">
-        <div className="hero-container">
-          <div className="hero-content">
-            <h1 className="hero-title"><span className="wave-emoji">👋</span> I'm Tai</h1>
-            <p className="hero-subtitle">
-              Stay Curious, Keep Learning
-            </p>
-            <p className="hero-description">
-              Welcome to my corner of the internet. I'm passionate about exploring new technologies, sharing my knowledge, experience, and exposure.
-            </p>
-            <div className="hero-buttons">
-              <Link to="/blog" className="btn btn-primary">View My Blog</Link>
-              <a href="#contact" className="btn btn-secondary">Get In Touch</a>
-            </div>
-          </div>
-        </div>
-      </section>
+  const [posts, setPosts] = useState([]);
 
-      <section id="contact" className="contact-section">
-        <div className="container">
-          <div className="contact-content">
-            <h2 className="contact-title">Get In Touch</h2>
-            <p className="contact-description">
-              I'd love to hear from you! Whether you have a question, want to collaborate, or just want to say hello, feel free to reach out.
-            </p>
-            <div className="contact-links">
-              <a href="mailto:me@taivu.dev" className="contact-link">
-                <span className="contact-icon">✉️</span>
-                <span className="contact-text">Email</span>
-              </a>
-              <a href="https://github.com/taivu7" target="_blank" rel="noopener noreferrer" className="contact-link">
-                <svg className="contact-icon" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                </svg>
-                <span className="contact-text">GitHub</span>
-              </a>
-              <a href="https://twitter.com/taiducvu" target="_blank" rel="noopener noreferrer" className="contact-link">
-                <svg className="contact-icon" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
-                </svg>
-                <span className="contact-text">Twitter</span>
-              </a>
-            </div>
+  useEffect(() => {
+    let active = true;
+    getRecentPosts(3)
+      .then((recent) => {
+        if (active) setPosts(recent);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return (
+    <div className="landing">
+      <div className="landing-inner">
+        {/* hero */}
+        <section id="about" className="landing-hero">
+          <div className="landing-eyebrow">Senior Data Scientist</div>
+          <h1 className="landing-hero-title landing-hero-quote">
+            “But when he comes, the Spirit of truth, he will guide you to all
+            truth. He will not speak on his own, but he will speak what he hears,
+            and will declare to you the things that are coming.”
+          </h1>
+          <div className="landing-hero-cite">— John 16:13</div>
+          <p className="landing-hero-lead">
+            Nine years turning machine learning and statistics into decisions
+            people trust — across telecom, cybersecurity, and SaaS. I lead data
+            teams and ship models that hold up in production.
+          </p>
+        </section>
+
+        {/* recent writing */}
+        <section id="writing">
+          <div className="landing-section-head">
+            <h2 className="landing-section-label">Recent writing</h2>
+            <Link to="/blog" className="landing-section-link">
+              All articles →
+            </Link>
+          </div>
+          <div className="landing-writing">
+            {posts.map((post) => (
+              <Link
+                key={post.slug}
+                to={`/blog/${post.slug}`}
+                className="landing-article"
+              >
+                <span className="landing-article-date">
+                  {formatMonthYear(post.date)}
+                </span>
+                <div>
+                  <div className="landing-article-title">{post.title}</div>
+                  <div className="landing-article-desc">{post.excerpt}</div>
+                </div>
+                <span className="landing-article-tag">
+                  {post.tags && post.tags[0]}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* experience */}
+        <section id="experience" className="landing-experience">
+          <h2 className="landing-section-label">Experience</h2>
+          <div className="landing-exp-list">
+            {EXPERIENCE.map((item) => (
+              <div key={item.role} className="landing-exp-row">
+                <div>
+                  <div className="landing-exp-role">{item.role}</div>
+                  <div className="landing-exp-detail">{item.detail}</div>
+                </div>
+                <span className="landing-exp-period">{item.period}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      {/* contact */}
+      <section id="contact" className="landing-contact">
+        <div className="landing-contact-inner">
+          <h2 className="landing-contact-title">
+            Building something with data? Let's talk.
+          </h2>
+          <p className="landing-contact-lead">
+            I'm always happy to trade notes on forecasting, NLP, or keeping
+            models alive in production.
+          </p>
+          <div className="landing-contact-actions">
+            <a
+              href="mailto:me@taivu.dev"
+              className="landing-btn landing-btn-primary"
+            >
+              Email me
+            </a>
+            <a
+              href="https://github.com/taivu7"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="landing-btn landing-btn-ghost"
+            >
+              GitHub
+            </a>
+            <a
+              href="https://www.linkedin.com/in/tai-vu"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="landing-btn landing-btn-ghost"
+            >
+              LinkedIn
+            </a>
           </div>
         </div>
       </section>
-    </>
+    </div>
   );
 }
 
