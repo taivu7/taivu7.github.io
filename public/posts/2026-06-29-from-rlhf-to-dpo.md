@@ -1,0 +1,135 @@
+---
+title: "From RLHF to DPO: A Simpler Way to Align Language Models"
+date: "2026-06-29"
+author: "Tai Vu"
+excerpt: "How do you turn 'humans prefer answer A over B' into a training signal? A ground-up tour of RLHF, the insight behind DPO, and how to choose between them."
+tags: ["LLM", "AI", "Alignment", "RLHF", "DPO"]
+readTime: "14 min read"
+featured: true
+slug: "from-rlhf-to-dpo"
+---
+
+# 🎯 From RLHF to DPO: A Simpler Way to Align Language Models
+
+## 1. Introduction — The Alignment Problem
+
+A pretrained language model is a strange kind of genius. It has read a sizeable fraction of the internet and absorbed grammar, facts, code, and reasoning patterns along the way. But ask it a question and it might answer with another question. Ask it for help and it might cheerfully complete your sentence instead. It knows a great deal—it just has no manners.
+
+To see the gap, imagine asking a base model: *"How do I fix my car?"*
+
+A well-pretrained but unaligned model might reply: *"How do I fix my bike? How do I fix my sink?"* It has pattern-matched your sentence to a list of similar-looking questions, because that is exactly what "predict the next token" rewards. It was never trained to be *helpful*—only to be *plausible*.
+
+What we actually want is something like: *"I'd be happy to help! What symptoms are you seeing—strange noises, warning lights, trouble starting?"*
+
+The gap between those two responses is the **alignment problem**. We have a model full of raw capability but with no sense of what a *good* response looks like. To close the gap, we need a way to communicate human preferences to the model during training—and that turns out to be harder than it sounds. The whole post hangs on a single deceptively simple question:
+
+> **How do you turn "humans prefer answer A over B" into a training signal?**
+
+There are two famous answers. The first is **RLHF** (Reinforcement Learning from Human Feedback)—the classic, powerful, and somewhat painful approach that aligned ChatGPT. The second is **DPO** (Direct Preference Optimization)—a lighter-weight method that reaches a similar destination without the reinforcement learning machinery.
+
+This post walks from the problem to both solutions, intuition first and formulas second, so lighter readers can stay aboard the whole way. By the end you'll understand not just *how* DPO works, but *why* it works—and when you should reach for it instead of RLHF.
+
+## 3. RLHF — The Classic Solution
+
+RLHF is the method that made ChatGPT possible. It's powerful and it scales—and it's also genuinely complicated to run. The whole thing is best understood as an assembly line with **three stages**, each feeding the next. We start with a model that can talk, teach a second model to *judge* answers, then use that judge to push the first model toward better behavior.
+
+Here's the bird's-eye view before we zoom in:
+
+```
+   Stage 1: SFT                Stage 2: Reward Model            Stage 3: PPO (RL)
+┌──────────────────┐        ┌────────────────────────┐      ┌────────────────────────┐
+│ Base model       │        │ Preference pairs        │      │ Policy generates an     │
+│   + demonstrations│  ──▶  │   (chosen yᵂ, reject yᴸ)│ ──▶ │   answer                │
+│ → SFT model      │        │ Train a Reward Model    │      │ RM scores it            │
+│ (learns to answer│        │   that outputs a single │      │ PPO updates the policy  │
+│  in the right    │        │   quality score         │      │   to score higher       │
+│  format)         │        │ → automatic "judge"     │      │ ↑ KL penalty keeps it   │
+│                  │        │                         │      │   close to the SFT model│
+└──────────────────┘        └────────────────────────┘      └────────────────────────┘
+```
+
+Let's walk each stage.
+
+### 3.1 — Stage 1: Supervised Fine-Tuning (SFT)
+
+Before you can teach taste, you have to teach *format*. Remember our base model from the intro that answered "How do I fix my car?" with another question? Stage 1 fixes exactly that.
+
+We take the pretrained base model and fine-tune it on a curated set of high-quality **prompt → response demonstrations**: examples written (or vetted) by humans showing what a good assistant reply looks like. "How do I fix my car?" → "I'd be happy to help! What symptoms are you seeing?" Thousands of these, across many topics.
+
+The model isn't learning new facts here—it already knows them from pretraining. It's learning a *behavior*: when you see a prompt, produce a helpful, on-topic answer instead of echoing or drifting. The output of this stage is the **SFT model**, and it's the foundation everything else builds on. Every later stage starts from this checkpoint—it's both our starting policy and, later, our anchor.
+
+SFT alone already gets you a usable assistant. But it has a ceiling: it can only imitate the demonstrations it was shown, and for most real questions there's no single "correct" demonstration to write down. To push past imitation, we need a way to express *preferences*—and that's Stage 2.
+
+### 3.2 — Stage 2: Training a Reward Model
+
+Here's a problem we have to solve before we can improve the model: **how do you tell a model that one answer is better than another?**
+
+The naive idea is to score each answer on an absolute scale—"rate this response from 1 to 10." But humans are surprisingly bad at this. Ask the same person to score one essay in isolation and you'll get 7 on Monday and 5 on Friday. We have no stable internal ruler. What humans *are* good at is **comparison**: show two answers side by side and ask "which is better?" and the judgments become fast and consistent. (This intuition gets its own full treatment earlier in the post; here we just need the consequence.)
+
+So the training data for this stage is **preference pairs**. For a given prompt $x$, a human is shown two candidate responses and picks a winner:
+
+- $y^W$ — the **chosen** (preferred) response
+- $y^L$ — the **rejected** response
+
+Now the trick: we train a separate network, the **reward model** $r(x, y)$, that reads a prompt and a response and outputs a single number—a quality score. We want it to assign a *higher* score to the chosen response than to the rejected one, for every pair in our dataset.
+
+To turn "chosen beat rejected" into a trainable loss, RLHF borrows the **Bradley–Terry model**, a classic way to convert pairwise comparisons into latent scores (the same math behind chess Elo ratings). It says the probability a human prefers $y^W$ over $y^L$ depends only on the *gap* between their scores, squashed through a sigmoid $\sigma$. Training the reward model means minimizing:
+
+$$\mathcal{L}_{RM} = -\log \sigma\big(r(x, y^W) - r(x, y^L)\big)$$
+
+Don't let it intimidate you—read it left to right. The term $r(x,y^W) - r(x,y^L)$ is "how much more the model scores the winner over the loser." We want that gap to be large and positive. The sigmoid + log turns "make the gap big" into a loss that's **strongest exactly when the model gets the ordering backwards** (predicts the loser is better) and nearly flat once it's confidently correct. The model spends its effort where it's wrong.
+
+Once trained, the reward model is a stand-in for a human judge—an **automatic scorer you can query millions of times** without paying a human for each one. That scalability is the whole point: it's what makes the next stage possible.
+
+### 3.3 — Stage 3: Optimizing the Policy with PPO
+
+Now we have a judge. Time to use it.
+
+The SFT model becomes our **policy** $\pi$—the thing we're actually training. The loop is conceptually simple: the policy generates a response, the reward model scores it, and we nudge the policy's weights to make high-scoring responses more likely. This is reinforcement learning: learning from a reward signal rather than from labeled targets. The standard algorithm here is **PPO (Proximal Policy Optimization)**.
+
+**The KL leash.** There's an immediate danger. If we optimize *purely* for reward, the policy will discover that the reward model—being just a neural net—has blind spots, and it will exploit them ruthlessly, drifting into weird, repetitive, or sycophantic text that scores high but reads terribly. To prevent this, RLHF adds a **KL-divergence penalty** that punishes the policy for straying too far from the original SFT model. The objective becomes:
+
+$$\max_{\pi} \; \mathbb{E}\big[\, r(x, y)\,\big] - \beta \, \mathrm{KL}\big(\pi \,\|\, \pi_{ref}\big)$$
+
+Read it as a tug-of-war: **"earn the highest reward you can, but don't wander far from the model you started with."** The reference $\pi_{ref}$ is the frozen SFT model; $\beta$ is the tension in the leash—crank it up and the policy barely moves, loosen it and the policy chases reward more aggressively (and more dangerously). Keep this KL term in mind: when we get to DPO, it makes a surprise return as the star of the show.
+
+**What's inside PPO (just enough).** You can understand RLHF without deriving PPO, but a few moving parts explain why it's heavy:
+
+- **Advantage** — instead of asking "was this response good?", PPO asks "was it *better than expected*?" The advantage is the reward minus a baseline. Learning from *better/worse-than-baseline* is far more stable than learning from raw scores.
+- **Value (critic) model** — something has to estimate that baseline, i.e. the expected reward from a given state. That's a *second* trained network, the critic, running alongside the policy.
+- **Clipped surrogate objective** — the "proximal" in PPO. Each update is mathematically *clipped* so the policy can't lurch too far in a single step. RL is unstable; this clipping is the seatbelt that keeps a single bad batch from wrecking the model.
+
+**The loop, in pseudocode.** Putting it together, one PPO training step looks like this:
+
+```python
+for each step:
+    prompts    = sample_batch()
+    responses  = policy.generate(prompts)          # online sampling — EXPENSIVE
+    rewards    = reward_model(prompts, responses)
+    rewards    = rewards - beta * KL(policy, ref)   # KL leash, baked into the signal
+    advantages = rewards - value_model(prompts)     # better-than-baseline?
+    update policy   via clipped PPO objective
+    update value_model
+```
+
+Notice the second line. Every single step, the policy must **generate fresh responses** to learn from—because PPO is *on-policy*: it can only learn from data the current model produces right now. You can't reuse last week's samples. That generation step is slow and expensive, and it happens continuously throughout training. Hold onto this detail; it's one of the biggest reasons people went looking for something simpler.
+
+### 3.4 — The Pain of RLHF
+
+RLHF works. It also hurts. Anyone who has actually run a PPO alignment loop will recognize this list—and every item on it is a reason DPO exists.
+
+**You're juggling up to four models at once.** Count them: the *policy* being trained, the frozen *reference* model for the KL term, the *reward* model, and the *value/critic* model. All resident in GPU memory, all needing to be served, before you've taken a single useful training step. The memory footprint is enormous, which alone puts full RLHF out of reach for many teams.
+
+**PPO is unstable.** Reinforcement learning is notoriously temperamental. A run that looked healthy can suddenly diverge, collapse into degenerate text, or oscillate without converging. Reproducing a result—even your own from last week, with the same code—can be maddening. You don't just *configure* an RLHF run; you *babysit* it.
+
+**It's brutally sensitive to hyperparameters.** The KL coefficient $\beta$, the learning rate, the number of PPO epochs per batch, the clip range—get any one of them wrong and the run fails silently or subtly degrades. The region of settings that actually works is narrow, and finding it is expensive trial and error.
+
+**Reward hacking is built into the design.** Think about the incentive structure: the policy's entire job is to maximize the reward model's score, which makes it *adversarial* toward that reward model by construction. So it relentlessly probes for the RM's weak spots and finds them—padding answers with length, piling on flattery, exploiting formatting quirks. The result scores beautifully and helps no one. You optimized the proxy, not the goal.
+
+**Online sampling is a constant tax.** Because PPO is on-policy, every step pays for fresh generation from the current model (that expensive line in the pseudocode). Generation is the slowest part of working with an LLM, and here it's not a one-time cost—it's woven into every iteration of training.
+
+Step back and the picture is clear: RLHF demands serious infrastructure, a high tolerance for instability, and constant supervision. At the frontier, with the budget and the team to match, it earns its keep. But for a small team with a handful of GPUs, it's a lot to ask. Which leads to the obvious, tantalizing question:
+
+> *What if we could skip the separate reward model and the whole reinforcement learning loop—and still learn directly from human preferences?*
+
+That question is exactly where DPO begins.
