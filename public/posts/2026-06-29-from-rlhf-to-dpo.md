@@ -29,7 +29,7 @@ There are two famous answers. The first is **RLHF** (Reinforcement Learning from
 
 This post walks from the problem to both solutions, intuition first and formulas second, so lighter readers can stay aboard the whole way. By the end you'll understand not just *how* DPO works, but *why* it works—and when you should reach for it instead of RLHF.
 
-## 3. RLHF — The Classic Solution
+## 2. RLHF — The Classic Solution
 
 RLHF is the method that made ChatGPT possible. It's powerful and it scales—and it's also genuinely complicated to run. The whole thing is best understood as an assembly line with **three stages**, each feeding the next. We start with a model that can talk, teach a second model to *judge* answers, then use that judge to push the first model toward better behavior.
 
@@ -50,7 +50,7 @@ Here's the bird's-eye view before we zoom in:
 
 Let's walk each stage.
 
-### 3.1 — Stage 1: Supervised Fine-Tuning (SFT)
+### 2.1 — Stage 1: Supervised Fine-Tuning (SFT)
 
 Before you can teach taste, you have to teach *format*. Remember our base model from the intro that answered "How do I fix my car?" with another question? Stage 1 fixes exactly that.
 
@@ -60,7 +60,7 @@ The model isn't learning new facts here—it already knows them from pretraining
 
 SFT alone already gets you a usable assistant. But it has a ceiling: it can only imitate the demonstrations it was shown, and for most real questions there's no single "correct" demonstration to write down. To push past imitation, we need a way to express *preferences*—and that's Stage 2.
 
-### 3.2 — Stage 2: Training a Reward Model
+### 2.2 — Stage 2: Training a Reward Model
 
 Here's a problem we have to solve before we can improve the model: **how do you tell a model that one answer is better than another?**
 
@@ -115,7 +115,7 @@ trainer.train()   # minimizes  −log σ( r(x, chosen) − r(x, rejected) )
 
 That comment on the last line *is* the formula we just wrote, turned into a running loop. In a small hands-on run this reaches around **95% pairwise accuracy**—the reward model reliably ranks the better answer above the worse one, which is all we need from a judge. This part is easy; the pain is entirely in what comes next.
 
-### 3.3 — Stage 3: Optimizing the Policy with PPO
+### 2.3 — Stage 3: Optimizing the Policy with PPO
 
 Now we have a judge. Time to use it.
 
@@ -178,7 +178,7 @@ Every knob from the theory is right there in plain sight: `kl_coef` is the $\bet
 
 And that last point is not hypothetical. Running this exact setup on a free 16 GB T4 GPU, the reward model trains without complaint—but the PPO step marches straight into an **out-of-memory wall**: four half-billion-parameter models in fp32 simply do not fit. (fp16 would halve the footprint, but on a T4 the generation step then produces `NaN`s, forcing fp32 back.) That failure isn't a bug—it's the lived experience that motivates the entire next section.
 
-### 3.4 — The Pain of RLHF
+### 2.4 — The Pain of RLHF
 
 RLHF works. It also hurts. Anyone who has actually run a PPO alignment loop will recognize this list—and every item on it is a reason DPO exists.
 
@@ -197,3 +197,51 @@ Step back and the picture is clear: RLHF demands serious infrastructure, a high 
 > *What if we could skip the separate reward model and the whole reinforcement learning loop—and still learn directly from human preferences?*
 
 That question is exactly where DPO begins.
+
+## 3. DPO's Twist — "Your Model Is Already a Reward Model"
+
+We ended the last section with a wish: *skip the separate reward model and the whole reinforcement-learning loop, and still learn directly from human preferences.* It sounds like asking for the cake after refusing to bake it. DPO's contribution is to show the wish isn't greedy at all—the cake was already on the table. The entire RLHF apparatus, it turns out, is an expensive way to compute something that has a clean, closed-form answer.
+
+Remember the promise from Stage 3: *keep the KL term in mind—when we get to DPO, it makes a surprise return as the star of the show.* Here it is.
+
+### 3.1 — RLHF was secretly solving a problem that already has an answer
+
+Recall the objective PPO spends all that effort chasing:
+
+$$\max_{\pi} \; \mathbb{E}_{y \sim \pi}\big[\, r(x, y)\,\big] - \beta \, \mathrm{KL}\big(\pi \,\|\, \pi_{ref}\big)$$
+
+PPO treats this as a search: generate, score, nudge, repeat—thousands of times. But this particular objective—"maximize reward while staying close to a reference"—is one that has been solved with pencil and paper. For *any* reward function, the policy that maximizes it has a known closed form:
+
+$$\pi^{*}(y \mid x) = \frac{1}{Z(x)}\, \pi_{ref}(y \mid x)\, \exp\!\Big(\tfrac{1}{\beta}\, r(x, y)\Big)$$
+
+Read it as a **reweighting of the reference model**. Start from $\pi_{ref}$—what the SFT model would say—and tilt it: multiply the probability of each response by $\exp(r/\beta)$, so high-reward answers get boosted and low-reward answers get suppressed. The size of the tilt is set by $\beta$: small $\beta$ tilts aggressively (chase reward hard), large $\beta$ tilts timidly (stay near the reference). The $Z(x)$ out front is just a normalizer that makes the probabilities sum to one.
+
+There's only one problem with this beautiful formula: that $Z(x)$. To compute it you'd have to sum $\exp(r/\beta)$ over *every possible response*—an astronomically large set. So you can't simply write down $\pi^{*}$ and be done. This intractable normalizer is exactly the wall that forced RLHF to reach for iterative RL in the first place.
+
+### 3.2 — The flip: every language model is already a reward model
+
+Here is the move that names the section. Instead of reading the formula *forward* (reward → optimal policy), turn it *around* and solve for the reward. A line of algebra on the equation above gives:
+
+$$r(x, y) = \beta \, \log \frac{\pi^{*}(y \mid x)}{\pi_{ref}(y \mid x)} \;+\; \beta \log Z(x)$$
+
+Sit with what this says. The reward of a response is—apart from that $Z(x)$ term, which depends only on the prompt—**just the log-ratio between the optimal policy and the reference**, scaled by $\beta$. Turn it inside out: *any* policy $\pi$ implicitly defines a reward, namely how much more (or less) probability it places on a response than the reference does. A model that has learned good behavior is, by this identity, already assigning high implicit reward to good answers. **Your model is already a reward model.** You were never missing a component—you were reading it in the wrong direction.
+
+### 3.3 — The DPO loss, and what it buys you
+
+We now have two facts to combine. From Stage 2, human preferences fit the Bradley–Terry model: the chance a labeler prefers $y^W$ to $y^L$ is $\sigma\big(r(x,y^W) - r(x,y^L)\big)$—it depends only on the *difference* of rewards. And from 3.2, each reward is a log-ratio plus $\beta\log Z(x)$.
+
+Watch what happens when we substitute. Both responses share the same prompt $x$, so both carry the *same* $\beta\log Z(x)$—and in a difference, it cancels. The intractable normalizer, the thing that blocked us in 3.1, simply vanishes. What's left is written entirely in terms of the policy we're training and the frozen reference:
+
+$$\mathcal{L}_{DPO} = -\log \sigma\!\left( \beta \log \frac{\pi_\theta(y^W \mid x)}{\pi_{ref}(y^W \mid x)} \;-\; \beta \log \frac{\pi_\theta(y^L \mid x)}{\pi_{ref}(y^L \mid x)} \right)$$
+
+Compare it to the reward-model loss from 2.2, $-\log\sigma\big(r(x,y^W) - r(x,y^L)\big)$. It's the **exact same shape**—the same "make the gap between winner and loser large" classifier—except the reward $r$ has been replaced by the policy's own log-ratio against the reference. We didn't train a judge and then optimize against it; we folded the two steps into one.
+
+Read the loss left to right, as we did the others. For each preference pair it pushes the policy to **raise the log-probability of the chosen response and lower it for the rejected one**—but always measured *relative to* $\pi_{ref}$. That relative-to-reference framing is the KL leash from Stage 3, no longer bolted on as a separate penalty but woven directly into the loss: $\beta$ and $\pi_{ref}$ sit right there in the equation. The star returned, exactly as promised.
+
+Now count the cost against RLHF's four-model bill from 2.4:
+
+- **Two models, not four.** Only the policy $\pi_\theta$ and the frozen reference $\pi_{ref}$. No separate reward model, no value/critic network.
+- **No reinforcement learning.** It's a supervised classification loss over a fixed dataset of preference pairs—the same kind of training you'd run for the reward model, and just as stable.
+- **No online generation.** Nothing is sampled during training, so the expensive per-step generation—the constant tax that dominated PPO—is gone. And with no reward model to game, the whole category of reward hacking disappears with it.
+
+That's the twist in one line: **RLHF learns a reward and then chases it; DPO recognizes that the policy *is* the reward, and optimizes it in a single supervised step.** Same destination—alignment to human preference—reached without the reinforcement-learning machinery we spent all of Section 2 wrestling with.
