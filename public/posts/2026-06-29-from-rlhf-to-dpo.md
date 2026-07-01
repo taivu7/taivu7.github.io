@@ -81,6 +81,40 @@ Don't let it intimidate you—read it left to right. The term $r(x,y^W) - r(x,y^
 
 Once trained, the reward model is a stand-in for a human judge—an **automatic scorer you can query millions of times** without paying a human for each one. That scalability is the whole point: it's what makes the next stage possible.
 
+**What this looks like in code.** You don't implement the Bradley–Terry loss by hand—libraries like Hugging Face's **TRL** package it into a `RewardTrainer`. The reward model itself is just a base LLM with its next-token head swapped for a single-number scoring head:
+
+```python
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from trl import RewardTrainer, RewardConfig
+import torch
+
+model_id = "Qwen/Qwen2.5-0.5B-Instruct"
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+tokenizer.pad_token = tokenizer.eos_token
+
+# num_labels=1 → replace the LM head with a head that emits ONE scalar: the reward.
+model = AutoModelForSequenceClassification.from_pretrained(
+    model_id, num_labels=1, dtype=torch.float16
+)
+model.config.pad_token_id = tokenizer.pad_token_id
+```
+
+The training data is exactly the preference pairs from above—each row carries a `chosen` and a `rejected` response (here, in chat format). `RewardTrainer` computes the Bradley–Terry loss internally, so training is a single call:
+
+```python
+# each row looks like: {"chosen": [...messages...], "rejected": [...messages...]}
+trainer = RewardTrainer(
+    model=model,
+    args=RewardConfig(max_length=1024, per_device_train_batch_size=4,
+                      learning_rate=1e-4, max_steps=100),
+    train_dataset=dataset,
+    processing_class=tokenizer,
+)
+trainer.train()   # minimizes  −log σ( r(x, chosen) − r(x, rejected) )
+```
+
+That comment on the last line *is* the formula we just wrote, turned into a running loop. In a small hands-on run this reaches around **95% pairwise accuracy**—the reward model reliably ranks the better answer above the worse one, which is all we need from a judge. This part is easy; the pain is entirely in what comes next.
+
 ### 3.3 — Stage 3: Optimizing the Policy with PPO
 
 Now we have a judge. Time to use it.
@@ -113,6 +147,36 @@ for each step:
 ```
 
 Notice the second line. Every single step, the policy must **generate fresh responses** to learn from—because PPO is *on-policy*: it can only learn from data the current model produces right now. You can't reuse last week's samples. That generation step is slow and expensive, and it happens continuously throughout training. Hold onto this detail; it's one of the biggest reasons people went looking for something simpler.
+
+**What this looks like in code.** TRL wraps this whole loop in a `PPOTrainer`—and its constructor tells the story better than any diagram. Count the models you have to hand it:
+
+```python
+from transformers import AutoModelForCausalLM, AutoModelForSequenceClassification
+from trl.experimental.ppo import PPOTrainer, PPOConfig
+
+base = "Qwen/Qwen2.5-0.5B-Instruct"
+
+# Four models resident in memory at once — the defining cost of RLHF:
+policy       = AutoModelForCausalLM.from_pretrained(base)                                 # what we're training
+ref_policy   = AutoModelForCausalLM.from_pretrained(base)                                 # frozen anchor for the KL leash
+reward_model = AutoModelForSequenceClassification.from_pretrained(rm_path, num_labels=1)  # the judge from Stage 2
+value_model  = AutoModelForSequenceClassification.from_pretrained(base,    num_labels=1)  # the critic (baseline)
+
+trainer = PPOTrainer(
+    args=PPOConfig(kl_coef=0.05, cliprange=0.2, response_length=48),
+    processing_class=tokenizer,
+    model=policy,
+    ref_model=ref_policy,
+    reward_model=reward_model,
+    value_model=value_model,
+    train_dataset=ppo_dataset,
+)
+trainer.train()   # generate → score → subtract baseline → clipped update, every step
+```
+
+Every knob from the theory is right there in plain sight: `kl_coef` is the $\beta$ on the leash, `cliprange` is the seatbelt on each update, and the four separate model arguments are the four networks you now have to fit into GPU memory *at the same time*.
+
+And that last point is not hypothetical. Running this exact setup on a free 16 GB T4 GPU, the reward model trains without complaint—but the PPO step marches straight into an **out-of-memory wall**: four half-billion-parameter models in fp32 simply do not fit. (fp16 would halve the footprint, but on a T4 the generation step then produces `NaN`s, forcing fp32 back.) That failure isn't a bug—it's the lived experience that motivates the entire next section.
 
 ### 3.4 — The Pain of RLHF
 
