@@ -4,7 +4,7 @@ date: "2026-06-29"
 author: "Tai Vu"
 excerpt: "How do you turn 'humans prefer answer A over B' into a training signal? A ground-up tour of RLHF, the insight behind DPO, and how to choose between them."
 tags: ["LLM", "AI", "Alignment", "RLHF", "DPO"]
-readTime: "14 min read"
+readTime: "25 min read"
 featured: true
 slug: "from-rlhf-to-dpo"
 ---
@@ -245,3 +245,155 @@ Now count the cost against RLHF's four-model bill from 2.4:
 - **No online generation.** Nothing is sampled during training, so the expensive per-step generation—the constant tax that dominated PPO—is gone. And with no reward model to game, the whole category of reward hacking disappears with it.
 
 That's the twist in one line: **RLHF learns a reward and then chases it; DPO recognizes that the policy *is* the reward, and optimizes it in a single supervised step.** Same destination—alignment to human preference—reached without the reinforcement-learning machinery we spent all of Section 2 wrestling with.
+
+## 4. How DPO Works — Step by Step
+
+Section 3 earned us the formula. This section is about what actually happens when you run it: what goes in, what one training step computes, which direction the weights move, and what the knobs do. If RLHF was an assembly line, DPO is a single machine—but it's worth opening the case and watching the gears turn once.
+
+### 4.1 — The ingredients
+
+Everything DPO needs fits in three bullet points:
+
+- **An SFT model.** Same as RLHF's Stage 1—you still need a model that answers in the right format. DPO replaces Stages 2 and 3, not Stage 1. You load it *twice*: one copy becomes the trainable policy $\pi_\theta$, the other is frozen as the reference $\pi_{ref}$.
+- **A preference dataset.** The exact same format as the reward-model data from 2.2: triples of (prompt $x$, chosen $y^W$, rejected $y^L$). Nothing new to collect—if you were preparing to train a reward model, you already have DPO's training set.
+- **The loss from 3.3.** That's it. No reward model to pretrain, no critic to warm up, no generation pipeline to stand up.
+
+Notice what's *missing* from the list: any step that runs before training can begin. RLHF has a whole Stage 2 you must finish (and validate!) before Stage 3 starts. DPO starts training immediately.
+
+### 4.2 — Anatomy of one training step
+
+Take a single preference pair and follow it through. Four forward passes, one subtraction, one sigmoid:
+
+```
+        prompt x, chosen yᵂ, rejected yᴸ
+                      │
+        ┌─────────────┴──────────────┐
+        ▼                            ▼
+  policy π_θ  (trainable)      reference π_ref  (frozen)
+  log π_θ(yᵂ|x)   ──┐          log π_ref(yᵂ|x)  ──┐
+  log π_θ(yᴸ|x)   ──┤          log π_ref(yᴸ|x)  ──┤
+        │           ▼                │            ▼
+        │   implicit rewards:        │
+        │   r̂ᵂ = β·[log π_θ(yᵂ|x) − log π_ref(yᵂ|x)]
+        │   r̂ᴸ = β·[log π_θ(yᴸ|x) − log π_ref(yᴸ|x)]
+        │                            │
+        └──────────┬─────────────────┘
+                   ▼
+        loss = −log σ( r̂ᵂ − r̂ᴸ )
+```
+
+Three things to notice, in order:
+
+**First, "the probability of a response" is just a sum.** A response is a token sequence, and a language model already assigns each token a log-probability given everything before it. So $\log \pi(y \mid x)$ is nothing exotic—run the model over the pair, sum the log-probs of the response tokens. This is the same computation as evaluating perplexity, and it's why DPO needs no generation: **the responses are already written in the dataset; we only ever *score* them.**
+
+**Second, the implicit rewards $\hat{r}^W$ and $\hat{r}^L$ are exactly Section 3's log-ratios.** Each one asks: *compared to the reference, how much has the policy grown to like this response?* A positive $\hat{r}^W$ means the policy now prefers the chosen answer more than the SFT model did. These numbers are worth watching during training—more on that in 4.4.
+
+**Third, the loss only cares about the margin** $\hat{r}^W - \hat{r}^L$. It's our Bradley–Terry classifier from 2.2 one more time: push the winner's implicit reward above the loser's, with the sigmoid making the push strongest when the ordering is wrong and gentle once it's confidently right.
+
+### 4.3 — Which way do the weights move?
+
+Differentiate the loss and the update direction becomes wonderfully readable. For each pair, the gradient does two things at once, scaled by one common factor:
+
+$$\nabla_\theta \mathcal{L}_{DPO} \;=\; -\,\beta \,\underbrace{\sigma\big(\hat{r}^L - \hat{r}^W\big)}_{\text{how wrong the model is}}\,\Big[\underbrace{\nabla_\theta \log \pi_\theta(y^W \mid x)}_{\text{push chosen up}} \;-\; \underbrace{\nabla_\theta \log \pi_\theta(y^L \mid x)}_{\text{push rejected down}}\Big]$$
+
+Read the three braces left to right:
+
+- **The weight, $\sigma(\hat{r}^L - \hat{r}^W)$,** is the model's current probability of getting this pair *backwards*. If the policy already ranks the chosen response far above the rejected one, this factor is near zero and the pair barely nudges the weights. If the policy has it upside down, the factor approaches one and the pair hits hard. Every example is weighted by *how wrong the model still is about it*—the same "spend effort where you're wrong" behavior we saw in the reward-model loss, now steering the policy directly.
+- **Push chosen up:** increase the log-probability of every token in $y^W$.
+- **Push rejected down:** decrease the log-probability of every token in $y^L$.
+
+And because both $\hat{r}$'s are measured against $\pi_{ref}$, the "how wrong" weight automatically shrinks as the policy drifts from the reference—the KL leash doing its job from *inside* the gradient, with no separate penalty term to tune.
+
+### 4.4 — What this looks like in code
+
+By now you can guess the shape: same TRL library, same trainer pattern as 2.2—except this one replaces *both* RLHF stages. Put the two constructors side by side and the whole argument of this post is visible in the argument lists:
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from trl import DPOTrainer, DPOConfig
+
+base = "Qwen/Qwen2.5-0.5B-Instruct"          # the SFT model (Stage 1 still required)
+tokenizer = AutoTokenizer.from_pretrained(base)
+
+policy = AutoModelForCausalLM.from_pretrained(base)   # π_θ — trainable
+ref    = AutoModelForCausalLM.from_pretrained(base)   # π_ref — frozen anchor
+
+# Two models. No reward_model=. No value_model=.
+trainer = DPOTrainer(
+    model=policy,
+    ref_model=ref,
+    args=DPOConfig(beta=0.1, learning_rate=5e-7, max_length=1024),
+    train_dataset=dataset,        # same {"prompt", "chosen", "rejected"} pairs as 2.2
+    processing_class=tokenizer,
+)
+trainer.train()   # minimizes  −log σ( β·log-ratio(chosen) − β·log-ratio(rejected) )
+```
+
+Compare this to the `PPOTrainer` call in 2.3: the `reward_model=` and `value_model=` lines are simply *gone*, and with them half the GPU memory bill. (In practice you can even drop `ref_model=` and pass a PEFT/LoRA config instead—TRL then recovers the reference by disabling the adapter, so only *one* full model sits in memory. That trick is what makes DPO comfortable on a free Colab/Kaggle GPU, where Section 2.3's four-model PPO setup hit an out-of-memory wall.)
+
+**What to watch while it trains.** With PPO you babysat divergence; with DPO you mostly read three gauges, all derived from the implicit rewards of 4.2:
+
+- `rewards/chosen` and `rewards/rejected` — the batch-average $\hat{r}^W$ and $\hat{r}^L$. Healthy runs show the two curves separating.
+- `rewards/margins` — the gap $\hat{r}^W - \hat{r}^L$, which should climb steadily.
+- `rewards/accuracies` — the fraction of pairs the policy ranks correctly, the single most interpretable number on the dashboard. It's the same "pairwise accuracy" we used to judge the reward model in 2.2—except now the *policy itself* is the judge being scored.
+
+One behavior surprises everyone the first time: the log-probability of the **chosen** responses often *drops* during training. That's expected—the loss only demands the margin grow, not that $\pi_\theta(y^W)$ rise in absolute terms; probability mass can flow to other good phrasings the dataset never listed. Watch the margin and the accuracy, not the raw log-probs.
+
+### 4.5 — The knob that matters: β
+
+DPO inherits exactly one important hyperparameter from the RLHF objective, and you already know what it does: $\beta$ is the **tension in the KL leash** from 2.3, now living inside the loss.
+
+- **Small β (≈ 0.01–0.05):** a loose leash. The implicit rewards are cheap to move, so the policy chases preference margins aggressively and drifts further from the SFT model. More alignment pressure, more risk of degrading fluency or forgetting.
+- **Large β (≈ 0.3–0.5):** a tight leash. Log-ratios get expensive, updates stay timid, and the policy hugs the reference—safer, but the preferences may barely sink in.
+- **The common default, β = 0.1,** sits in the middle, and in practice DPO is *far* more forgiving about this single knob than PPO ever was about its half-dozen (recall 2.4: KL coefficient, learning rate, PPO epochs, clip range, batch schedule…). Typical DPO tuning is one β sweep and an unusually small learning rate (~5e-7—note the scale: preference gradients are sharp, and a standard fine-tuning rate would overshoot).
+
+Step back and look at what the four subsections added up to. Training data you already had, two models instead of four, a loss whose gradient you can read aloud, three gauges instead of a babysitting shift, and one knob instead of six. **The step-by-step of DPO is short precisely because the cleverness was spent in the math, not the infrastructure.** The obvious next question is the honest one: if DPO is this much simpler, why does RLHF still exist? That trade-off is where we turn next.
+
+## 5. RLHF vs DPO — When to Use Which
+
+Two sections of praise for DPO have earned RLHF the right to a rebuttal. The derivation in Section 3 was exact, but exactness in math doesn't mean equivalence in practice—the two methods optimize the same objective *under different conditions*, and those conditions are where the real trade-offs live. So let's play fair.
+
+### 5.1 — What DPO quietly gave up
+
+**DPO is offline; it never explores.** Look back at the anatomy in 4.2: every response DPO learns from was *already written in the dataset*. The policy is never asked to generate anything, so it can never be corrected on its own mistakes—only on the mistakes some other model (whoever produced the dataset's responses) happened to make. PPO's expensive online sampling, the "constant tax" we complained about in 2.4, buys exactly this: the model is graded on *its own current outputs*, including whatever novel failure modes it just invented. As training moves the policy away from the models that generated the data, DPO's preference pairs slowly become critiques of someone the policy no longer is.
+
+**The implicit reward doesn't generalize the way an explicit one does.** RLHF's reward model is a standalone artifact: once trained, it can score *any* response to *any* prompt—responses no human ever labeled—and it can be reused across runs, checked for calibration, even audited on its own. DPO's "reward" exists only as a log-ratio between two specific checkpoints; it evaluates the dataset's pairs and nothing more. When you paid RLHF's four-model bill, one of the things you bought was a judge that generalizes.
+
+**Offline optimization can overshoot.** The DPO loss is perfectly happy to keep growing the margin on pairs it already ranks correctly—and with a small or narrow dataset, the cheapest way to grow margins is often to crush the probability of rejected responses toward zero, dragging fluent phrasings down with them. This is the failure mode behind the surprising gauge behavior in 4.4 (chosen log-probs drifting down), taken to its pathological end. RLHF, graded on fresh samples every step, gets caught immediately when its actual outputs degrade; DPO can look great on its three gauges while quietly wandering out of distribution.
+
+### 5.2 — Why the frontier still runs RL
+
+This is why the largest labs—the ones aligning ChatGPT-, Claude-, and Gemini-class models—still run reinforcement learning at scale. It isn't nostalgia. At that scale the equation flips:
+
+- The **infrastructure objection dissolves.** Four models in memory is a crisis on one 16 GB T4 (we watched it OOM in 2.3); it's a rounding error on a dedicated training cluster with a serving fleet.
+- **Exploration compounds.** A frontier model is aligned through many rounds: sample from the current policy, collect fresh preferences on *those* samples, update, repeat. The data distribution tracks the policy instead of lagging behind it—something no fixed offline dataset can do.
+- **The reward model becomes a platform.** Once you have a good judge, you can point it at new tasks, blend it with rule-based signals, and iterate on the policy without re-collecting human labels each time. The judge outlives any single training run.
+
+The honest summary: **DPO removed RLHF's infrastructure, and with it RLHF's ceiling.** For most teams the infrastructure was the binding constraint, so DPO is a pure win. For the few teams where it isn't, the ceiling is what matters.
+
+### 5.3 — The decision, in one table
+
+This table is lifted from a hands-on lab that ran both methods back to back on the same free-tier GPU—the same experiment quoted throughout Section 2:
+
+| | RLHF (RM + PPO) | DPO |
+|---|---|---|
+| Separate reward model | Yes — trained and validated first | No |
+| Algorithm | PPO: generate → score → update (RL) | One classification loss |
+| Models in memory during training | 4 (policy + ref + reward + value) | 2 (policy + ref); 1 with LoRA |
+| Generation during training | **Yes** — the source of most trouble | No |
+| Tuning difficulty / babysitting | High (six coupled knobs, unstable) | Low (mostly β) |
+| Explores its own outputs | Yes — learns from fresh samples | No — fixed offline pairs |
+| Reusable judge afterwards | Yes — the reward model | No |
+| Runs on a free 16 GB GPU | No (OOM'd in practice) | Yes, comfortably |
+
+Read the first five rows and choose DPO; read the last three and understand why frontier labs don't. As a rule of thumb: **if your preference data is a fixed dataset and your GPUs are countable on one hand, use DPO and don't look back. Reach for RLHF when you can afford to keep collecting preferences on your model's own outputs—because that feedback loop is the one thing DPO structurally cannot replicate.**
+
+**The family keeps growing.** DPO's real legacy may be the door it opened. Once "alignment = one clever supervised loss" was on the table, variants followed quickly: **ORPO** folds the preference term into SFT itself, dropping even the reference model (one model in memory—the logical endpoint of the count we've been running all post); **KTO** learns from unpaired thumbs-up/thumbs-down labels instead of pairs; **SimPO** removes the reference by normalizing over length. The details differ, but they're all descendants of the same flip from Section 3.
+
+### 5.4 — Closing the loop
+
+We opened with one deceptively simple question: *how do you turn "humans prefer answer A over B" into a training signal?*
+
+Now we can answer it twice. **RLHF answers with a system:** teach a judge to imitate human preferences, then run a reinforcement-learning loop against that judge, with a KL leash to keep things sane—powerful, scalable, and heavy. **DPO answers with a formula:** notice that the leash-constrained objective has a closed-form solution, invert it, and the "judge" turns out to be readable off the policy itself—the whole system collapses into one supervised loss.
+
+Same Bradley–Terry foundation, same KL anchor, same destination. The difference is where the effort goes: RLHF spends it on infrastructure, DPO spends it on algebra. And that, more than any benchmark, is the lesson worth keeping: **sometimes the biggest simplification in engineering comes from noticing that the problem you're solving iteratively has already been solved on paper.**
