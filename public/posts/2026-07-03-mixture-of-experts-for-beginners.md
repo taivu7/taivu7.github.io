@@ -139,7 +139,7 @@ print(output.shape)           # torch.Size([4, 64])
 
 **One honesty note: this naive loop is for learning, not production.** Looping over tokens one at a time in Python is slow, and no real MoE implementation does it this way. Production kernels group tokens by which expert they were routed to, batch each group into a single matrix multiply, and run on specialized, highly optimized kernels. The mechanics—route, select top-k, weight, combine—are identical; only the execution strategy changes for speed.
 
-Even at this toy scale, the parameter story already shows up: `MoELayer()` above allocates and stores weights for all 8 experts, but any single token's `forward` pass only ever calls 2 of them. Scale `n_experts` up, replicate this pattern across every FFN slot in a big transformer, and you get exactly the shape of Mixtral's **47B total, 13B active** parameters: everything is stored, only a fraction is computed per token.
+Even at this toy scale, the parameter story already shows up: `MoELayer()` above allocates and stores weights for all 8 experts, but any single token's `forward` pass only ever calls 2 of them. Scale `n_experts` up, replicate this pattern across every FFN slot in a big transformer, and you get exactly the shape of Mixtral's **~47B total, ~13B active** parameters: everything is stored, only a fraction is computed per token.
 
 ---
 
@@ -177,3 +177,23 @@ DeepSeek-V3's numbers look strange at first—671B total but only 37B active is 
 And then there's GPT-4. For a while now, leaks and technical reporting have claimed GPT-4 uses a Mixture-of-Experts architecture, and the rumor has circulated widely enough that many people now treat it as settled fact. It isn't. OpenAI has never confirmed any of it, and no official numbers exist for GPT-4's total or active parameter counts. Treat the row above exactly as labeled: **widely rumored, not verified.**
 
 Look across this table and a pattern emerges: Switch Transformer, Mixtral, DeepSeek-V3, and (if the rumors hold) GPT-4 are four different labs, four different years, converging on the same trick. When you want more capability per inference dollar, MoE is the default answer.
+
+---
+
+## 7. Recap + What to Read Next
+
+Section 1 asked how Mixtral packs almost 47 billion parameters of knowledge into a model that runs like a 13B one. Here's the short answer, five bullets:
+
+- **MoE replaces one big FFN with many experts plus a tiny router**, and each token only passes through the top-k of them—not all of them.
+- **Total parameters and active parameters are different numbers.** Total is what you store on disk and in GPU memory; active is what you actually compute for a given token. That gap is the whole trick.
+- **Mixtral: 46.7B total, ~12.9B active per token**—top-2 of 8 experts, per layer. Big-model knowledge, mid-model compute.
+- **The price shows up in two places.** Training needs load-balancing pressure so the router doesn't collapse onto a favorite handful of experts, and every one of the 8 experts—used or not, on any given token—still has to sit resident in memory at all times.
+- **Experts specialize, but not into anything human-legible.** There's no "math expert" or "French expert" hiding in there; specialization tends to show up in surface patterns, not clean topics you could name.
+
+If you want to go past a beginner tour, these are the sources this post draws on:
+
+- Shazeer et al. 2017 — https://arxiv.org/abs/1701.06538
+- Switch Transformer (Fedus et al. 2021) — https://arxiv.org/abs/2101.03961
+- Mixtral of Experts (Jiang et al. 2024) — https://arxiv.org/abs/2401.04088
+- DeepSeek-V3 Technical Report — https://arxiv.org/abs/2412.19437
+- Hugging Face — "Mixture of Experts Explained" — https://huggingface.co/blog/moe
