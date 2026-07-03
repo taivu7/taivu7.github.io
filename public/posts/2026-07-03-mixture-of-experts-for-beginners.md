@@ -75,3 +75,68 @@ This is **sparsity** in a nutshell: you store all ~47B parameters on disk and in
 One more wrinkle worth flagging: routing is **per token, per layer**. There's no single "path" a token takes through the whole model. The same token might be sent to experts 2 and 5 at layer 5, then experts 1 and 7 at layer 20. Every layer makes its own independent routing decision, for every token, every time.
 
 This sounds complicated. In code, it's about forty lines.
+
+---
+
+## 4. Code: A Minimal MoE Layer in PyTorch
+
+Here is a complete MoE layer. It runs as-is—paste it into a notebook, no edits required.
+
+```python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class Expert(nn.Module):
+    """A standard Transformer FFN: expand, activate, project back."""
+    def __init__(self, d_model, d_hidden):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(d_model, d_hidden),
+            nn.GELU(),
+            nn.Linear(d_hidden, d_model),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+class MoELayer(nn.Module):
+    def __init__(self, d_model=64, d_hidden=256, n_experts=8, top_k=2):
+        super().__init__()
+        self.experts = nn.ModuleList(
+            [Expert(d_model, d_hidden) for _ in range(n_experts)]
+        )
+        self.router = nn.Linear(d_model, n_experts)
+        self.top_k = top_k
+
+    def forward(self, x):
+        # x: (n_tokens, d_model)
+        scores = self.router(x)                        # (n_tokens, n_experts)
+        top_scores, top_idx = scores.topk(self.top_k, dim=-1)
+        weights = F.softmax(top_scores, dim=-1)        # (n_tokens, top_k)
+
+        out = torch.zeros_like(x)
+        for token in range(x.shape[0]):                # naive loop, for clarity
+            for k in range(self.top_k):
+                expert = self.experts[top_idx[token, k]]
+                out[token] += weights[token, k] * expert(x[token])
+        return out
+
+moe = MoELayer()
+tokens = torch.randn(4, 64)   # a tiny "sentence": 4 tokens, d_model=64
+output = moe(tokens)
+print(output.shape)           # torch.Size([4, 64])
+```
+
+**Reading it against Section 3, piece by piece:**
+
+- `Expert` is nothing exotic—it's just a normal transformer FFN: expand to `d_hidden`, apply an activation, project back down to `d_model`. This is the "specialist," and there's nothing specialist-looking about its code.
+- `self.router` is a single `nn.Linear(d_model, n_experts)`. That's it. The receptionist deciding where every token goes is one small matrix—tiny compared to the eight FFNs sitting next to it.
+- `scores.topk(self.top_k, dim=-1)` followed by `F.softmax` is "pick 2 specialists and weight their opinions": `topk` selects the winning experts, `softmax` turns their two scores into weights that sum to 1.
+- The double `for` loop is the literal hospital hallway: each token visits only its `top_k` experts, not all eight. The outer loop walks tokens; the inner loop walks that token's two chosen specialists.
+
+**Tracing one token through the layer**, with invented numbers: suppose the router scores token 0 across all 8 experts as `[2.1, -0.3, 0.8, 1.5, -1.1, 0.2, 0.4, -0.6]`. The top-2 are expert 0 (score 2.1) and expert 3 (score 1.5). Softmax over just those two scores gives weights `[0.69, 0.31]`. The token runs through expert 0's full FFN and expert 3's full FFN, and the layer's output for that token is `0.69 · expert_0(x) + 0.31 · expert_3(x)`. Experts 1, 2, 4, 5, 6, and 7 never touch this token.
+
+**One honesty note: this naive loop is for learning, not production.** Looping over tokens one at a time in Python is slow, and no real MoE implementation does it this way. Production kernels group tokens by which expert they were routed to, batch each group into a single matrix multiply, and run on specialized, highly optimized kernels. The mechanics—route, select top-k, weight, combine—are identical; only the execution strategy changes for speed.
+
+Even at this toy scale, the parameter story already shows up: `MoELayer()` above allocates and stores weights for all 8 experts, but any single token's `forward` pass only ever calls 2 of them. Scale `n_experts` up, replicate this pattern across every FFN slot in a big transformer, and you get exactly the shape of Mixtral's **47B total, 13B active** parameters: everything is stored, only a fraction is computed per token.
