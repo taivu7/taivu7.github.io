@@ -140,3 +140,40 @@ print(output.shape)           # torch.Size([4, 64])
 **One honesty note: this naive loop is for learning, not production.** Looping over tokens one at a time in Python is slow, and no real MoE implementation does it this way. Production kernels group tokens by which expert they were routed to, batch each group into a single matrix multiply, and run on specialized, highly optimized kernels. The mechanics—route, select top-k, weight, combine—are identical; only the execution strategy changes for speed.
 
 Even at this toy scale, the parameter story already shows up: `MoELayer()` above allocates and stores weights for all 8 experts, but any single token's `forward` pass only ever calls 2 of them. Scale `n_experts` up, replicate this pattern across every FFN slot in a big transformer, and you get exactly the shape of Mixtral's **47B total, 13B active** parameters: everything is stored, only a fraction is computed per token.
+
+---
+
+## 5. The Catch: Training Is Tricky
+
+Stacking eight experts behind a router sounds simple, but training that setup to actually behave is where MoE earns its reputation for being finicky.
+
+**The first problem is router collapse—the "rich get richer" trap.** At the start of training, the router's weights are close to random, so its preferences for one expert over another are just noise. But noise is enough to get the loop started. Say the router happens to lean slightly toward expert 2 early on. Expert 2 now sees more tokens than its neighbors, so it gets more gradient updates, so it gets a little better at its job, so the router—which is learning to send tokens wherever they're handled best—leans toward it even harder next step. That feedback loop compounds. Left unchecked, training can converge to a state where 2 of the 8 experts do nearly all the work and the other 6 sit there barely trained, contributing almost nothing. You paid for 8 experts and got 2. It's exactly the failure mode the hospital analogy warns about: a receptionist who, for no good reason, keeps sending every patient to the same two doctors while six specialists' offices gather dust.
+
+**The fix, at the level of intuition, is an auxiliary load-balancing loss.** We're skipping the formula—it's not needed to understand what it does. Think of it as a tax on favoritism: alongside the model's normal training objective (predict the next token well), you add a small penalty that rises when routing gets lopsided and falls when tokens are spread roughly evenly across experts. The model is now optimizing two things at once—be accurate, and don't play favorites—and that second nudge is usually enough to keep all 8 experts alive and useful.
+
+### MoE Saves Compute, Not Memory
+
+**Sparsity cuts compute, but it does nothing for memory.** Every expert, including the ones a given token never visits, has to sit resident in GPU memory at all times—the router doesn't decide which experts a token needs until that token actually arrives at the layer, and by then there's no time to page an unused expert in from disk. Mixtral computes like a 13B model but must be *loaded* like a 47B model, all 46.7B parameters, all the time. That's the practical reason you can't run Mixtral on a GPU sized for a 13B dense model: the FLOPs are cheap, but the VRAM bill is for the whole hospital, not just the two doctors on duty for this patient.
+
+Two more caveats worth a sentence each, not a deep dive: MoE training is often reported as **less stable** than dense training, with a higher risk of loss spikes if the balancing act above goes wrong. And **fine-tuning a pretrained MoE is fiddlier** than fine-tuning a dense model of similar active size, since small routing shifts during fine-tuning can quietly starve experts that were fine at pretraining time.
+
+---
+
+## 6. MoE in the Wild
+
+**The idea behind MoE is not new.** Robert Jacobs and Michael Jordan, in "Adaptive Mixtures of Local Experts" (1991), described training separate small networks alongside a gating network that learns to route inputs among them—the receptionist-and-specialists structure from Section 2, more than three decades before Mixtral existed. Back then, "experts" were tiny by today's standards and the whole setup ran on hardware nowhere near capable of today's LLMs, so the idea mostly sat dormant for years. It was revived at massive scale by Shazeer et al. in "Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer" (2017), which built a 137B-parameter, LSTM-based MoE and showed that sparsity could work at genuinely huge scale, well before transformers were the dominant architecture. Transformers got their own MoE treatment with the **Switch Transformer** (Fedus et al., 2021), which simplified routing down to **top-1**—one expert per token, instead of top-2 or more—and used that simplicity to scale all the way to **1.6 trillion parameters**.
+
+Seeing the actual numbers side by side makes the total-vs-active split from Section 3 concrete:
+
+| Model | Year | Total params | Active per token | Experts / routing |
+|---|---|---|---|---|
+| Switch Transformer | 2021 | up to 1.6T | ~one expert's worth | top-1 |
+| Mixtral 8x7B | 2023 | 46.7B | 12.9B | 8 experts, top-2 |
+| DeepSeek-V3 | 2024 | 671B | 37B | 256 fine-grained + 1 shared, top-8 |
+| GPT-4 (rumored) | 2023 | undisclosed | undisclosed | widely rumored MoE, unconfirmed |
+
+DeepSeek-V3's numbers look strange at first—671B total but only 37B active is an even sparser ratio than Mixtral's—until you see the twist. Instead of a handful of large experts, DeepSeek-V3 uses many small, **fine-grained experts**, plus one always-on **shared expert** that every single token passes through no matter what the router decides. The idea is division of labor at a finer grain: common knowledge that basically every token needs lives permanently in the shared expert, so the router's job simplifies to picking out the specialized fine-grained experts a token actually needs on top of that baseline, rather than every routed expert reinventing the same common patterns.
+
+And then there's GPT-4. For a while now, leaks and technical reporting have claimed GPT-4 uses a Mixture-of-Experts architecture, and the rumor has circulated widely enough that many people now treat it as settled fact. It isn't. OpenAI has never confirmed any of it, and no official numbers exist for GPT-4's total or active parameter counts. Treat the row above exactly as labeled: **widely rumored, not verified.**
+
+Look across this table and a pattern emerges: Switch Transformer, Mixtral, DeepSeek-V3, and (if the rumors hold) GPT-4 are four different labs, four different years, converging on the same trick. When you want more capability per inference dollar, MoE is the default answer.
