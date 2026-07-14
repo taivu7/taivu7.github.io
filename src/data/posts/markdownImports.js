@@ -19,6 +19,7 @@ export const loadMarkdownFromFiles = async (fileName) => {
 
 // List of markdown files to import
 export const markdownFiles = [
+  '2026-07-14-debugging-a-rag-agent.md',
   '2026-07-08-finding-your-unknowns.md',
   '2026-07-03-mixture-of-experts-for-beginners.md',
   '2026-06-29-from-rlhf-to-dpo.md',
